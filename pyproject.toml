@@ -7,12 +7,13 @@ name = "roboml"
 version = "0.2.0"
 description = "Machine learning models optimized for robotics experimentation and deployment"
 authors = [{ name = "Automatika Robotics", email = "contact@automatikarobotics.com" }]
+readme = "README.md"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-keywords = ["robots", "robotics", "machine learning", "multimodal"]
+keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learning"]
 dependencies = [
     "accelerate",
     "transformers",

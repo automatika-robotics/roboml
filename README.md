@@ -11,6 +11,8 @@ RoboML is an aggregator package written for quickly deploying open source ML mod
 
 RoboML has been tested on Ubuntu 20.04 and later. It should ideally be installed on a system with a GPU and CUDA 12.1. However, it should work without a GPU. If you encounter any installation problems, please open an issue.
 
+`pip install roboml`
+
 ### From Source
 
 ```shell
@@ -20,7 +22,7 @@ pip install pip-tools
 pip install .
 ```
 
-### For vision model support
+### For vision models support
 
 If you want to utilize detection and tracking using Vision models from the MMDetection library, you will need to install a couple of dependancies as follows:
 

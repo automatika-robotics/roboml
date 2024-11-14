@@ -17,9 +17,6 @@ from scipy.io.wavfile import write
 
 from roboml.tools.download import DownloadManager
 
-# Considering utils is in src/roboml, get path to log config
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-logging.config.fileConfig(PROJECT_ROOT / Path("log.ini"))
 logger = logging.getLogger("roboml")
 
 

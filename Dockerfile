@@ -8,9 +8,7 @@ WORKDIR /roboml
 
 COPY . .
 
-RUN apt-get update && apt-get install -y python3 python3-pip && pip install pip-tools && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-RUN pip install pytorch==2.4.0
+RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && pip install pip-tools && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN pip install .[vision]
 

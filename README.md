@@ -2,10 +2,10 @@
 
 RoboML is an aggregator package written for quickly deploying open source ML models for robots. It is designed to cover two basic use cases.
 
-- __Readily deploy various useful models:__ The package provides a wrapper around the 🤗 [**Transformers**](https://github.com/huggingface/transformers) and [**SentenceTransformers**](https://www.sbert.net/) libraries. Pretty much all relevant open source models from these libraries can be quickly deployed behind a highly scalable server endpoint.
-- __Deploy Detection Models with Tracking__: With RoboML one can deploy all detection models available in [**MMDetection**](https://github.com/open-mmlab/mmdetection). An open source vision model aggregation library. These detection models can also be seemlesly used for tracking.
-- __Use Open Source Vector DBs__: RoboML provides a unified interface for deploying Vector DBs along with ML models. Currently it is packaged with [**ChromaDB**](https://www.trychroma.com/) an open source multimodal vector database.
-- __Aggregate robot specific ML models from the Robotics community__: RoboML aims to be an aggregator package of models trained by the robotics community. These models can range from Multimodal LLMs, vision models, or robot action models, and can be used with ROS based functional components. See the usage in [ROS Agents](https://automatika-robotics.github.io/ros-agents)
+- **Readily deploy various useful models:** The package provides a wrapper around the 🤗 [**Transformers**](https://github.com/huggingface/transformers) and [**SentenceTransformers**](https://www.sbert.net/) libraries. Pretty much all relevant open source models from these libraries can be quickly deployed behind a highly scalable server endpoint.
+- **Deploy Detection Models with Tracking**: With RoboML one can deploy all detection models available in [**MMDetection**](https://github.com/open-mmlab/mmdetection). An open source vision model aggregation library. These detection models can also be seemlesly used for tracking.
+- **Use Open Source Vector DBs**: RoboML provides a unified interface for deploying Vector DBs along with ML models. Currently it is packaged with [**ChromaDB**](https://www.trychroma.com/) an open source multimodal vector database.
+- **Aggregate robot specific ML models from the Robotics community**: RoboML aims to be an aggregator package of models trained by the robotics community. These models can range from Multimodal LLMs, vision models, or robot action models, and can be used with ROS based functional components. See the usage in [ROS Agents](https://automatika-robotics.github.io/ros-agents)
 
 ## Installation
 
@@ -27,19 +27,25 @@ pip install .
 If you want to utilize detection and tracking using Vision models from the MMDetection library, you will need to install a couple of dependancies as follows:
 
 - Install roboml using the vision flag:
-`pip install roboml[vision]`
-- Install mmcv using the installation instructions provided [here](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). For installation with pip, simply pick PyTorch and CUDA version that you have installed and copy the pip installation command generated.
+  `pip install roboml[vision]`
+- Install mmcv using the installation instructions provided [here](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). For installation with pip, simply pick PyTorch and CUDA version that you have installed and copy the pip installation command generated. For example for PyTorch 2.1:
+  `pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html`
 - Install mmdetection as follows:
+
 ```shell
 git clone https://github.com/open-mmlab/mmdetection.git
 cd mmdetection
 pip install -v -e .
 ```
 
+- Install ffmpeg and libGL are missing then run the following:
+`sudo apt-get update && apt-get install ffmpeg libsm6 libxext6`
+
 ## Build in a Docker container (Recommended)
 
 - Install docker desktop.
 - Install [NVIDIA toolkit for Docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
 ```shell
 git clone https://github.com/automatika-robotics/roboml.git && cd roboml
 docker build --tag=automatika:roboml .

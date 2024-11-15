@@ -17,7 +17,7 @@ keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learni
 dependencies = [
     "accelerate",
     "transformers",
-    "bitsandbytes",
+    "bitsandbytes ; platform_machine == 'x86_64'",
     "pillow",
     "msgpack",
     "msgpack_numpy",

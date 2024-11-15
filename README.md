@@ -31,7 +31,9 @@ If you want to utilize detection and tracking using Vision models from the MMDet
   `pip install roboml[vision]`
 
 - Install mmcv using the installation instructions provided [here](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). For installation with pip, simply pick PyTorch and CUDA version that you have installed and copy the pip installation command generated. For example for PyTorch 2.1:
-  `pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html`
+
+   `pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html`
+
 - Install mmdetection as follows:
 
 ```shell

@@ -27,7 +27,9 @@ pip install .
 If you want to utilize detection and tracking using Vision models from the MMDetection library, you will need to install a couple of dependancies as follows:
 
 - Install roboml using the vision flag:
+
   `pip install roboml[vision]`
+
 - Install mmcv using the installation instructions provided [here](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). For installation with pip, simply pick PyTorch and CUDA version that you have installed and copy the pip installation command generated. For example for PyTorch 2.1:
   `pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html`
 - Install mmdetection as follows:
@@ -39,7 +41,21 @@ pip install -v -e .
 ```
 
 - Install ffmpeg and libGL are missing then run the following:
+
 `sudo apt-get update && apt-get install ffmpeg libsm6 libxext6`
+
+### Model quantization support
+
+Roboml uses [bitsandbytes](https://huggingface.co/docs/bitsandbytes/main/en/index) for model quantization. However it is only installed as a dependency automatically on **x86_64** architectures as bitsandbytes pre-built wheels are not available for other architectures. For other architures, such as _aarch64_ on NVIDIA Jetson boards, it is recommended to build bitsandbytes from source using the following instructions:
+
+```shell
+git clone https://github.com/bitsandbytes-foundation/bitsandbytes.git && cd bitsandbytes/
+pip install -r requirements-dev.txt
+cmake -DCOMPUTE_BACKEND=cuda -S .
+make
+pip install .
+```
+More details are available on the bitsandbytes [installation page](https://huggingface.co/docs/bitsandbytes/main/en/installation).
 
 ## Build in a Docker container (Recommended)
 
@@ -48,7 +64,11 @@ pip install -v -e .
 
 ```shell
 git clone https://github.com/automatika-robotics/roboml.git && cd roboml
+# build the container image
 docker build --tag=automatika:roboml .
+# for NVIDIA Jetson boards replace the above command with
+docker build --tag=automatika:roboml -f Dockerfile.Jetson .
+# run the container with gpu support
 docker run --runtime=nvidia --gpus all --rm -p 8000:8000 automatika:roboml
 ```
 

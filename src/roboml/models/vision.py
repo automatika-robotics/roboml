@@ -145,20 +145,23 @@ class VisionModel(ModelTemplate):
         # If labels being tracked dont exist, return
         if scores.size == 0:
             return result
-        detections_to_track = [
-            Detection(bbox.reshape((2, 2)).mean(axis=0), label=label)
-            for label, bbox in zip(labels, bboxes, strict=False)
-        ]
+        detections_to_track = []
+        for label, bbox in zip(labels, bboxes, strict=False):
+            box = bbox.reshape(2, 2)
+            detections_to_track.append(
+                Detection(np.vstack([box, box.mean(axis=0)]), label=label)
+            )
+
         tracked_objects = tracker.update(detections=detections_to_track)
 
         if tracked_objects:
-            result["centroids"] = []
+            result["tracked_points"] = []
             result["tracked_labels"] = []
             result["ids"] = []
             result["estimated_velocities"] = []
             for obj in tracked_objects:
+                result["tracked_points"].append(obj.estimate.tolist())
                 result["tracked_labels"].append(obj.label)
-                result["centroids"].append(obj.estimate.tolist())
                 result["ids"].append(obj.id)
                 result["estimated_velocities"].append(obj.estimate_velocity.tolist())
 

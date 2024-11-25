@@ -1,13 +1,18 @@
 from typing import Optional, Union
 
 import numpy as np
+import torch
 from platformdirs import user_cache_dir
 
 from roboml.interfaces import DetectionInput
 from roboml.ray import app, ingress_decorator
-from ._base import ModelTemplate
+from _base import ModelTemplate
 
-from roboml.utils import get_mmdet_model, pre_process_images_to_np
+from roboml.utils import (
+    get_mmdet_model,
+    pre_process_images_to_np,
+    convert_with_mmdeploy,
+)
 from mmdet.apis import inference_detector, init_detector
 from norfair import Detection, Tracker
 
@@ -34,6 +39,7 @@ class VisionModel(ModelTemplate):
         num_trackers: int = 1,
         tracking_distance_function: str = "euclidean",
         tracking_distance_threshold: int = 30,
+        deploy_tensorrt: bool = False,
     ) -> None:
         """_initialize.
         :param cache_dir:
@@ -41,9 +47,19 @@ class VisionModel(ModelTemplate):
         :param _:
         :rtype: None
         """
+        self.deploy_tensorrt = deploy_tensorrt
         # check if the checkpoint exists in cache else download it
-        config, weights = get_mmdet_model(user_cache_dir(cache_dir), checkpoint)
+        cache = user_cache_dir(cache_dir)
+        config, weights = get_mmdet_model(cache, checkpoint, self.logger)
+
         self.model = init_detector(config, weights, device=self.device)
+        self.data_classes = self.model.dataset_meta["classes"]
+
+        # deploy tensorrt version if asked
+        if deploy_tensorrt:
+            self.model, self.input_shape, self.task_processor = convert_with_mmdeploy(
+                config, weights, self.device, cache
+            )
 
         if setup_trackers:
             self.trackers = [
@@ -65,10 +81,16 @@ class VisionModel(ModelTemplate):
 
         get_dataset_labels = True if data.labels_to_track else data.get_dataset_labels
 
-        # handle base64 encoded images
-        images = pre_process_images_to_np(data.images)
+        if self.deploy_tensorrt:
+            # NOTE: TensorRT deployments currently handle one image at a time
+            images = pre_process_images_to_np(data.images, concatenate=True)
+            model_inputs, _ = self.task_processor.create_input(images, self.input_shape)
+            with torch.no_grad():
+                detections = self.model.test_step(model_inputs)
+        else:
+            images = pre_process_images_to_np(data.images)
+            detections = inference_detector(self.model, images)
 
-        detections = inference_detector(self.model, images)
         results = []
 
         # filter and convert results from DetObject tensors to lists
@@ -87,7 +109,7 @@ class VisionModel(ModelTemplate):
                     if get_dataset_labels:
                         # get text labels from model dataset info
                         labels = np.vectorize(
-                            lambda x: self.model.dataset_meta["classes"][x],
+                            lambda x: self.data_classes[x],
                         )(labels)
 
                 result = {

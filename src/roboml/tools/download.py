@@ -94,7 +94,7 @@ class DownloadManager:
         Resume the download if resumable, or log a message if not supported.
         """
         if not self.resumable:
-            # TODO(ajay): handle this in a better way
+            # TODO: handle this in a better way
             logging.warning("Resuming is not supported for this URL.")
             return
 

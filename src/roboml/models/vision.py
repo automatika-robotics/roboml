@@ -6,14 +6,16 @@ from platformdirs import user_cache_dir
 
 from roboml.interfaces import DetectionInput
 from roboml.ray import app, ingress_decorator
-from _base import ModelTemplate
+from ._base import ModelTemplate
 
 from roboml.utils import (
     get_mmdet_model,
     pre_process_images_to_np,
     convert_with_mmdeploy,
 )
-from mmdet.apis import inference_detector, init_detector
+from mmdet.apis import init_detector
+from mmdet.utils import get_test_pipeline_cfg
+from mmcv.transforms import Compose
 from norfair import Detection, Tracker
 
 
@@ -53,13 +55,20 @@ class VisionModel(ModelTemplate):
         config, weights = get_mmdet_model(cache, checkpoint, self.logger)
 
         self.model = init_detector(config, weights, device=self.device)
+
         self.data_classes = self.model.dataset_meta["classes"]
 
-        # deploy tensorrt version if asked
         if deploy_tensorrt:
+            # deploy tensorrt version if asked
             self.model, self.input_shape, self.task_processor = convert_with_mmdeploy(
                 config, weights, self.device, cache
             )
+        else:
+            # other build test pipeline
+            test_pipeline = get_test_pipeline_cfg(self.model.cfg)
+            test_pipeline[0].type = "mmdet.LoadImageFromNDArray"
+
+            self.test_pipeline = Compose(test_pipeline)
 
         if setup_trackers:
             self.trackers = [
@@ -81,15 +90,29 @@ class VisionModel(ModelTemplate):
 
         get_dataset_labels = True if data.labels_to_track else data.get_dataset_labels
 
-        if self.deploy_tensorrt:
-            # NOTE: TensorRT deployments currently handle one image at a time
-            images = pre_process_images_to_np(data.images, concatenate=True)
-            model_inputs, _ = self.task_processor.create_input(images, self.input_shape)
-            with torch.no_grad():
-                detections = self.model.test_step(model_inputs)
-        else:
-            images = pre_process_images_to_np(data.images)
-            detections = inference_detector(self.model, images)
+        # pre-process images if strings received
+        images = pre_process_images_to_np(data.images)
+        detections = []
+
+        for img in images:
+            if self.deploy_tensorrt:
+                model_inputs, _ = self.task_processor.create_input(
+                    img, self.input_shape
+                )
+                with torch.no_grad():
+                    # result is already a list
+                    detections += self.model.test_step(model_inputs)
+            else:
+                data_ = {"img": img}
+                # build the data pipeline
+                data_ = self.test_pipeline(data_)
+
+                # mmdet preprocessing qwirks
+                data_["inputs"] = [data_["inputs"]]
+                data_["data_samples"] = [data_["data_samples"]]
+
+                with torch.no_grad():
+                    detections.append(self.model.test_step(data_)[0])
 
         results = []
 

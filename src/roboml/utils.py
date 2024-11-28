@@ -58,7 +58,8 @@ def pre_process_images_to_np(
             return data[0]
         return np.array(PILImage.open(BytesIO(base64.b64decode(data[0]))))
     if isinstance(data[0], np.ndarray):
-        return [img for img in data if isinstance(img, np.ndarray)]
+        # assume the whole list is ndarray
+        return data  # type: ignore
     return [np.array(PILImage.open(BytesIO(base64.b64decode(img)))) for img in data]
 
 

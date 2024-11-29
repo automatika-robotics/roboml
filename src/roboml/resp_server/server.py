@@ -101,17 +101,15 @@ class Server:
         self.available_methods.update(methods)
 
     @validate_call
-    def add_node(self, node_name: str, node_type: str) -> list[str]:
+    def add_node(self, node_name: str, node_type: str) -> list[str] | str:
         """Initiate the model node and get all defined methods available"""
 
         # Check for name duplication
         if node_name in self.node_dict:
-            self.logger.error(
-                f"Name duplication. A node with name {node_name} already exists."
+            self.logger.warning(
+                f"Name duplication. A model/db with name {node_name} already exists."
             )
-            raise ValueError(
-                f"Name duplication. A node with name {node_name} already exists."
-            )
+            return f"Warning: Name duplication. A model/db with name {node_name} already exists."
         if hasattr(models, node_type):
             module = getattr(models, node_type)
         # Add exception for VisionModel

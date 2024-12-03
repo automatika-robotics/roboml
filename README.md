@@ -1,4 +1,14 @@
 # RoboML 🤖
+[![PyPI][pypi-badge]][pypi-url]
+[![MIT licensed][mit-badge]][mit-url]
+[![Python Version][python-badge]][python-url]
+
+[pypi-badge]: https://img.shields.io/pypi/v/roboml.svg
+[pypi-url]: https://pypi.org/project/roboml/
+[mit-badge]: https://img.shields.io/pypi/l/roboml.svg
+[mit-url]: https://github.com/automatika-robotics/roboml/LICENSE
+[python-badge]: https://img.shields.io/pypi/pyversions/roboml.svg
+[python-url]: https://www.python.org/downloads/
 
 RoboML is an aggregator package written for quickly deploying open source ML models for robots. It is designed to cover two basic use cases.
 

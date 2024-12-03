@@ -8,12 +8,17 @@ version = "0.2.3"
 description = "Machine learning models optimized for robotics experimentation and deployment"
 authors = [{ name = "Automatika Robotics", email = "contact@automatikarobotics.com" }]
 readme = "README.md"
+license = { text = "MIT" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-]
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",]
+
 keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learning"]
+
 dependencies = [
     "accelerate",
     "transformers",

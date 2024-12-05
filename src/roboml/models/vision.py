@@ -60,6 +60,13 @@ class VisionModel(ModelTemplate):
 
         if deploy_tensorrt:
             # deploy tensorrt version if asked
+            try:
+                import tensorrt
+            except ModuleNotFoundError as e:
+                raise ModuleNotFoundError(
+                    "NVIDIA tensorrt needs to be installed for TensorRT deployment. Find install instructions on this link https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html"
+                ) from e
+            self.logger.info(f"Found tensorrt version {tensorrt.__version__}")
             self.model, self.input_shape, self.task_processor = convert_with_mmdeploy(
                 config, weights, self.device, cache
             )

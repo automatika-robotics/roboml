@@ -32,11 +32,11 @@ pip install pip-tools
 pip install .
 ```
 
-### For vision models support
+## For vision models support
 
 If you want to utilize detection and tracking using Vision models from the MMDetection library, you will need to install a couple of dependancies as follows:
 
-- Install roboml using the vision flag:
+- Install RoboML using the vision flag:
 
   `pip install roboml[vision]`
 
@@ -52,13 +52,16 @@ cd mmdetection
 pip install -v -e .
 ```
 
-- Install ffmpeg and libGL are missing then run the following:
+- If ffmpeg and libGL are missing then run the following:
 
 `sudo apt-get update && apt-get install ffmpeg libsm6 libxext6`
 
-### Model quantization support
+### TensorRT Based Model Deployment
+Vision models in RoboML can be deployed for faster inference with NVIDIA TensorRT, whenever NVIDIA GPU support is available. This deployment is currently supported for Linux based x86_64 systems. TensorRT needs to be installed in order for this feature to work. Please check out detailed install instructions [here](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
 
-Roboml uses [bitsandbytes](https://huggingface.co/docs/bitsandbytes/main/en/index) for model quantization. However it is only installed as a dependency automatically on **x86_64** architectures as bitsandbytes pre-built wheels are not available for other architectures. For other architures, such as _aarch64_ on NVIDIA Jetson boards, it is recommended to build bitsandbytes from source using the following instructions:
+## Model quantization support
+
+RoboML uses [bitsandbytes](https://huggingface.co/docs/bitsandbytes/main/en/index) for model quantization. However it is only installed as a dependency automatically on **x86_64** architectures as bitsandbytes pre-built wheels are not available for other architectures. For other architures, such as _aarch64_ on NVIDIA Jetson boards, it is recommended to build bitsandbytes from source using the following instructions:
 
 ```shell
 git clone https://github.com/bitsandbytes-foundation/bitsandbytes.git && cd bitsandbytes/
@@ -86,7 +89,7 @@ docker run --runtime=nvidia --gpus all --rm -p 8000:8000 automatika:roboml
 
 ## Servers
 
-By default roboml starts models as [ray serve](https://docs.ray.io/en/latest/serve/index.html) apps. Making the models scalable accross multiple infrastructure configurations. See [ray serve](https://docs.ray.io/en/latest/serve/index.html) for details.
+By default RoboML starts models as [ray serve](https://docs.ray.io/en/latest/serve/index.html) apps. Making the models scalable accross multiple infrastructure configurations. See [ray serve](https://docs.ray.io/en/latest/serve/index.html) for details.
 
 ### An Experimental Server based on RESP
 
@@ -118,7 +121,7 @@ And run the following in the root directory
 
 The code in this distribution is Copyright (c) 2024 Automatika Robotics unless explicitly indicated otherwise.
 
-ROS Agents is made available under the MIT license. Details can be found in the [LICENSE](LICENSE) file.
+RoboML is made available under the MIT license. Details can be found in the [LICENSE](LICENSE) file.
 
 ## Contributions
 

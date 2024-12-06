@@ -211,7 +211,7 @@ class Server:
 
             # if background task then run in threadpool
             if background_task:
-                # TODO: Retreive exceptions here
+                # TODO: Retrieve exceptions here
                 self.pool.submit(command, **raw_args)
                 writer.write(OK)
                 return None

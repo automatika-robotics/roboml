@@ -325,7 +325,7 @@ def _build_mmdet_model_dict(pkg_path: Path) -> dict:
                     }
     except Exception as e:
         logger.error(
-            "Exception occured with reading models metadata from mmdetection package, make sure mmdetection was correctly installed"
+            "Exception occurred with reading models metadata from mmdetection package, make sure mmdetection was correctly installed"
         )
         raise e
     return all_models
@@ -344,7 +344,7 @@ def _load_mm_config(config: Path | str):
         cfg = Config.fromfile(Path(config))
     except Exception as e:
         logger.error(
-            f"Exception occured when read config. Make sure mmengine is correctly installed. {e}"
+            f"Exception occurred when read config. Make sure mmengine is correctly installed. {e}"
         )
         raise
     return cfg
@@ -363,7 +363,7 @@ def _dump_mm_config(cfg, config_path: Path) -> None:
         cfg.dump(config_path)
     except Exception as e:
         logger.error(
-            f"Exception occured when dumping config. Make sure mmengine is correctly installed. {e}"
+            f"Exception occurred when dumping config. Make sure mmengine is correctly installed. {e}"
         )
         raise
 

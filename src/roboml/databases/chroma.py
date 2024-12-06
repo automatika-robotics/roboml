@@ -79,7 +79,7 @@ class ChromaDB(VectorDBTemplate):
                 ids=data.ids,
             )
         except Exception as e:
-            self.logger.error(f"Exception occured: {e}")
+            self.logger.error(f"Exception occurred: {e}")
             raise
 
         return {"output": "Success"}
@@ -114,7 +114,7 @@ class ChromaDB(VectorDBTemplate):
                     ids=already_existing_ids, metadatas=metadatas_to_update
                 )
         except Exception as e:
-            self.logger.error(f"Exception occured: {e}")
+            self.logger.error(f"Exception occurred: {e}")
             raise
 
         # delete from indices that were updated
@@ -127,7 +127,7 @@ class ChromaDB(VectorDBTemplate):
 
     @app.post("/metadata_query")
     def _metadata_query(self, data: DBMetadataQuery) -> dict:
-        """Retreive data by metadata query.
+        """Retrieve data by metadata query.
         :param data:
         :param type: DBMetadataQuery
         :rtype: dict
@@ -148,7 +148,7 @@ class ChromaDB(VectorDBTemplate):
         # if no filters, return output as None
         if len(all_filters) == 0:
             self.logger.warning(
-                "The metadata filters received were empty, please call query method for retreiving data without metadata filtering."
+                "The metadata filters received were empty, please call query method for retrieving data without metadata filtering."
             )
             return {"output": []}
 
@@ -161,14 +161,14 @@ class ChromaDB(VectorDBTemplate):
             # get filtered data
             output = collection.get(where=filters)
         except Exception as e:
-            self.logger.error(f"Exception occured: {e}")
+            self.logger.error(f"Exception occurred: {e}")
             raise
         return {"output": output}
 
     @app.post("/query")
     def _query(self, data: DBQuery) -> dict:
         """
-        Retreives results for a given DB query
+        Retrieves results for a given DB query
         :param data:
         :param type: DBQuery
         :rtype: dict
@@ -183,7 +183,7 @@ class ChromaDB(VectorDBTemplate):
                 or []
             )
         except Exception as e:
-            self.logger.error(f"Exception occured: {e}")
+            self.logger.error(f"Exception occurred: {e}")
             raise
 
         return {"output": output}

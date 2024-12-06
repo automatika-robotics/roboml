@@ -6,7 +6,7 @@ class StreamReader(asyncio.StreamReader):
     Overrides the official StreamReader to address the
     following issue: http://bugs.python.org/issue30861
 
-    Also it leverages to get rid of the dobule buffer and
+    Also it leverages to get rid of the double buffer and
     get rid of one coroutine step. Data flows from the buffer
     to the Redis parser directly.
     Copyright (c) 2014-2017 Alexey Popravka

@@ -46,13 +46,13 @@ class AppFactory:
         """
 
         if node_name in self.app_dict:
-            logger.error(
-                f"Name duplication. An node with name {node_name} already exists."
+            logger.warning(
+                f"Name duplication. A model/db with name {node_name} already exists."
             )
-            raise HTTPException(
-                status_code=400,
-                detail=f"Name duplication. A node with name {node_name} already exists.",
-            )
+            return {
+                "node": node_name,
+                "warning": f"Name duplication. A model/db with name {node_name} already exists.",
+            }
 
         if hasattr(models, node_type):
             module = getattr(models, node_type)

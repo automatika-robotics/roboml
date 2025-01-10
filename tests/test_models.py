@@ -69,9 +69,7 @@ def test_vllms(loaded_img, models_in_module):
         "chat_history": True,
     }
     inputs.append(VLLMInput(**data))
-    inputs.append(
-        VLLMInput(query="How is it made?", images=[loaded_img], chat_history=True)
-    )
+    inputs.append(VLLMInput(query="How is it made?", images=[loaded_img]))
     run_models(models_in_module, inputs, log_output=True)
 
 

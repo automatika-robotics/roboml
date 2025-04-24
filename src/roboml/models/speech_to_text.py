@@ -5,19 +5,16 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
 from transformers.pipelines.audio_utils import ffmpeg_read
 
 from roboml.interfaces import SpeechToTextInput
-from roboml.ray import app, ingress_decorator
 from roboml.utils import b64_str_to_bytes, get_quantization_config
 
 from ._base import ModelTemplate
 
 
-@ingress_decorator
 class Whisper(ModelTemplate):
     """
     Whisper model for Audio to text.
     """
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "openai/whisper-small.en",
@@ -39,7 +36,6 @@ class Whisper(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
 
-    @app.post("/inference")
     def _inference(self, data: SpeechToTextInput) -> dict:
         """
         Model Inference
@@ -60,7 +56,7 @@ class Whisper(ModelTemplate):
         input_features = self.pre_processor(
             query,
             sampling_rate=self.pre_processor.feature_extractor.sampling_rate,
-            return_tensors="pt"
+            return_tensors="pt",
         ).input_features.to(self.device, dtype=torch.float16)
 
         # make inference

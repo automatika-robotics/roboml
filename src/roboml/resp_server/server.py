@@ -14,7 +14,8 @@ from pydantic import ValidationError, validate_call
 
 from roboml import databases, models
 from roboml.resp_server.stream import StreamReader
-from roboml.utils import is_background_task
+from roboml.resp_server.node import RESPNode
+from roboml.utils import is_background_task, logging
 
 MAX_CHUNK_SIZE = 65536
 OK = b"+OK\r\n"
@@ -101,7 +102,7 @@ class Server:
         self.available_methods.update(methods)
 
     @validate_call
-    def add_node(self, node_name: str, node_type: str) -> list[str] | str:
+    def add_node(self, node_name: str, node_model: str) -> list[str] | str:
         """Initiate the model node and get all defined methods available"""
 
         # Check for name duplication
@@ -110,10 +111,10 @@ class Server:
                 f"Name duplication. A model/db with name {node_name} already exists."
             )
             return f"Warning: Name duplication. A model/db with name {node_name} already exists."
-        if hasattr(models, node_type):
-            module = getattr(models, node_type)
+        if hasattr(models, node_model):
+            module = getattr(models, node_model)
         # Add exception for VisionModel
-        elif node_type == "VisionModel":
+        elif node_model == "VisionModel":
             try:
                 from roboml.models.vision import VisionModel
             except ModuleNotFoundError as e:
@@ -124,16 +125,18 @@ class Server:
                     "In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection as explained here, https://github.com/automatika-robotics/robml"
                 ) from e
             module = VisionModel
-        elif hasattr(databases, node_type):
-            module = getattr(databases, node_type)
+        elif hasattr(databases, node_model):
+            module = getattr(databases, node_model)
         else:
-            self.logger.error(f"Requested node class {node_type} does not exist")
+            self.logger.error(f"Requested node class {node_model} does not exist")
             raise ModuleNotFoundError(
-                f"{node_type} is not a supported model/vectordb type in roboml library. Please use an available model/vectordb type or use another client."
+                f"{node_model} is not a supported model/vectordb type in roboml library. Please use an available model/vectordb type or use another client."
             )
 
         # Initialize node
-        node = module(name=node_name)
+        node = RESPNode(
+            name=node_name, model=module(logger=logging.getLogger(node_name))
+        )
         self.node_dict[node.name] = node
 
         # filter out dunder and internal methods and add model name;

@@ -10,19 +10,16 @@ from transformers import (
 )
 
 from roboml.interfaces import TextToSpeechInput
-from roboml.ray import app, ingress_decorator
 from roboml.utils import post_process_audio
 
 from ._base import ModelTemplate
 
 
-@ingress_decorator
 class Bark(ModelTemplate):
     """
     Bark TTS model for text to audio (by Suno AI)
     """
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "suno/bark-small",
@@ -40,7 +37,6 @@ class Bark(ModelTemplate):
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
         self.voice = voice
 
-    @app.post("/inference")
     def _inference(self, data: TextToSpeechInput) -> dict:
         """Model Inference.
         :param data:
@@ -62,7 +58,6 @@ class Bark(ModelTemplate):
         return {"output": audio}
 
 
-@ingress_decorator
 class SpeechT5(ModelTemplate):
     """
     SpeechT5 TTS model for text to audio.
@@ -82,7 +77,6 @@ class SpeechT5(ModelTemplate):
     }
     speaker_dataset_vects: str = "Matthijs/cmu-arctic-xvectors"
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "microsoft/speecht5_tts",
@@ -102,7 +96,6 @@ class SpeechT5(ModelTemplate):
         )
         self.voice = voice
 
-    @app.post("/inference")
     def _inference(self, data: TextToSpeechInput) -> dict:
         """Model Inference.
         :param data:

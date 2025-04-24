@@ -10,13 +10,11 @@ from transformers import (
 )
 
 from roboml.interfaces import VLLMInput
-from roboml.ray import app, ingress_decorator
 from roboml.utils import get_quantization_config, pre_process_images_to_pil
 
 from ._base import ModelTemplate
 
 
-@ingress_decorator
 class Idefics(ModelTemplate):
     """
     Idefics model for VQA.
@@ -31,7 +29,6 @@ class Idefics(ModelTemplate):
         self.history_buff: io.StringIO = io.StringIO()
         self.reset_phrase = ""
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "HuggingFaceM4/idefics-9b-instruct",
@@ -58,7 +55,6 @@ class Idefics(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
 
-    @app.post("/inference")
     def _inference(self, data: VLLMInput) -> dict:
         """Model inference.
         :param data:
@@ -111,7 +107,6 @@ class Idefics(ModelTemplate):
         return prompt
 
 
-@ingress_decorator
 class TransformersMLLM(ModelTemplate):
     """
     Transformers model for VQA.
@@ -125,7 +120,6 @@ class TransformersMLLM(ModelTemplate):
         # init chat prompt
         self.init_chat_prompt = None
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "HuggingFaceM4/idefics2-8b",
@@ -154,7 +148,6 @@ class TransformersMLLM(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
 
-    @app.post("/inference")
     def _inference(self, data: VLLMInput) -> dict:
         """Model inference.
         :param data:

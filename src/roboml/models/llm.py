@@ -7,13 +7,11 @@ from transformers import (
 )
 
 from roboml.interfaces import LLMInput
-from roboml.ray import app, ingress_decorator
 from roboml.utils import get_quantization_config
 
 from ._base import ModelTemplate
 
 
-@ingress_decorator
 class TransformersLLM(ModelTemplate):
     """
     Transformers LLM.
@@ -27,7 +25,6 @@ class TransformersLLM(ModelTemplate):
         # init chat prompt
         self.init_chat_prompt = None
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "microsoft/Phi-3-mini-4k-instruct",
@@ -56,7 +53,6 @@ class TransformersLLM(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoTokenizer.from_pretrained(checkpoint)
 
-    @app.post("/inference")
     def _inference(self, data: LLMInput) -> dict:
         """Model inference.
         :param data:

@@ -5,7 +5,6 @@ import torch
 from platformdirs import user_cache_dir
 
 from roboml.interfaces import DetectionInput
-from roboml.ray import app, ingress_decorator
 from ._base import ModelTemplate
 
 from roboml.utils import (
@@ -19,7 +18,6 @@ from mmcv.transforms import Compose
 from norfair import Detection, Tracker
 
 
-@ingress_decorator
 class VisionModel(ModelTemplate):
     """
     Object detection models from MMDetection.
@@ -32,7 +30,6 @@ class VisionModel(ModelTemplate):
         super().__init__(**kwargs)
         self.trackers: Optional[list[Tracker]] = None
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "dino-4scale_r50_8xb2-12e_coco",
@@ -86,7 +83,6 @@ class VisionModel(ModelTemplate):
                 for _ in range(num_trackers)
             ]
 
-    @app.post("/inference")
     def _inference(self, data: DetectionInput) -> dict:
         """Model Inference.
 

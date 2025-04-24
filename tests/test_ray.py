@@ -10,8 +10,8 @@ from roboml.main import ray
 
 HOST = "http://localhost"
 PORT = 8000
-MODEL_NAME = "idefics"
-MODEL_TYPE = "Idefics2"
+MODEL_NAME = "test"
+MODEL_TYPE = "TransformersLLM"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -43,7 +43,11 @@ def test_add_node():
     """
     Test adding model node
     """
-    node_params = {"node_name": MODEL_NAME, "node_type": MODEL_TYPE}
+    node_params = {
+        "node_name": MODEL_NAME,
+        "node_type": "HTTP",
+        "node_model": MODEL_TYPE,
+    }
 
     # create node
     response = httpx.post(f"{HOST}:{PORT}/add_node", params=node_params, timeout=30)
@@ -66,14 +70,8 @@ def test_model_inference():
     Test initializing model
     """
 
-    img = cv2.imread("tests/resources/test.jpeg", cv2.COLOR_BGR2RGB)
-
-    encode_params = [int(cv2.IMWRITE_PNG_COMPRESSION), 9]
-    _, buffer = cv2.imencode(".png", img, encode_params)
-    img_str = base64.b64encode(buffer).decode("utf-8")
-
     # call model inference
-    body = {"query": "What do you see?", "images": [img_str]}
+    body = {"query": [{"role": "user", "content": "Whats up?"}]}
     response = httpx.post(
         f"{HOST}:{PORT}/{MODEL_NAME}/inference", json=body, timeout=30
     )

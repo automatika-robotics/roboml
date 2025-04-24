@@ -45,7 +45,7 @@ def run_models(models_in_module, inputs, log_output=False):
     Init models and run inference
     """
     for Model in models_in_module:
-        model = Model(name="test")
+        model = Model(logger=logging.getLogger("test"))
         logging.info(f"Testing {Model.__name__}")
         model._initialize()
         for input in inputs:
@@ -64,7 +64,7 @@ def test_vllms(loaded_img, models_in_module):
     """
     inputs = []
     data = {
-        "query": "What do you see?",
+        "query": [{"role": "user", "content": "What do you see?"}],
         "images": [loaded_img],
         "chat_history": True,
     }

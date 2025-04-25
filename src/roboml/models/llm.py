@@ -1,10 +1,9 @@
-from typing import Optional
+from typing import Optional, AsyncGenerator
+from queue import Empty
+import asyncio
 
 import torch
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-)
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 
 from roboml.interfaces import LLMInput
 from roboml.utils import get_quantization_config
@@ -23,13 +22,14 @@ class TransformersLLM(ModelTemplate):
         """
         super().__init__(**kwargs)
         # init chat prompt
-        self.init_chat_prompt = None
+        self.init_chat_prompt: Optional[str] = None
 
     def _initialize(
         self,
         checkpoint: str = "microsoft/Phi-3-mini-4k-instruct",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
+        stream: bool = False,
     ) -> None:
         """Initialize Model.
 
@@ -42,6 +42,7 @@ class TransformersLLM(ModelTemplate):
         :rtype: None
         """
         self.init_chat_prompt = system_prompt
+        self.stream = stream
         quantization_config = get_quantization_config(quantization, self.logger)
         self.model = AutoModelForCausalLM.from_pretrained(
             checkpoint,
@@ -53,7 +54,7 @@ class TransformersLLM(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoTokenizer.from_pretrained(checkpoint)
 
-    def _inference(self, data: LLMInput) -> dict:
+    def _inference(self, data: LLMInput) -> dict | AsyncGenerator:
         """Model inference.
         :param data:
         :param type: LLMInput
@@ -65,21 +66,30 @@ class TransformersLLM(ModelTemplate):
             data.query, tokenize=False, add_generation_prompt=True
         )
 
-        inputs = self.pre_processor([text], return_tensors="pt").to(self.device)
-
-        with torch.no_grad():
-            generated_ids = self.model.generate(
-                **inputs,
-                do_sample=True,
-                temperature=data.temperature,
-                max_new_tokens=data.max_new_tokens,
+        if self.stream:
+            streamer = TextIteratorStreamer(
+                self.pre_processor,
+                timeout=0,
+                skip_prompt=True,
+                skip_special_tokens=True,
             )
+            self.loop.run_in_executor(
+                None,
+                self.generate_text,
+                text,
+                data.max_length,
+                data.temperature,
+                streamer,
+            )
+            return self.consume_streamer(streamer)
+
+        input_ids, generated_ids = self.generate_text(
+            text, data.max_length, data.temperature, None
+        )
 
         generated_ids = [
             output_ids[len(input_ids) :]
-            for input_ids, output_ids in zip(
-                inputs.input_ids, generated_ids, strict=True
-            )
+            for input_ids, output_ids in zip(input_ids, generated_ids, strict=True)
         ]
 
         generated_text = self.pre_processor.batch_decode(
@@ -87,3 +97,33 @@ class TransformersLLM(ModelTemplate):
         )[0].strip()
 
         return {"output": generated_text}
+
+    def generate_text(
+        self,
+        text: str,
+        max_length: int,
+        temperature: float,
+        streamer: Optional[TextIteratorStreamer],
+    ):
+        input_ids = self.pre_processor([text], return_tensors="pt").input_ids.to(
+            self.device
+        )
+        with torch.no_grad():
+            generated_ids = self.model.generate(
+                input_ids,
+                streamer=streamer,
+                max_length=max_length,
+                do_sample=True,
+                temperature=temperature,
+            )
+        if not streamer:
+            return input_ids, generated_ids
+
+    async def consume_streamer(self, streamer: TextIteratorStreamer):
+        while True:
+            try:
+                for token in streamer:
+                    yield token
+                break
+            except Empty:
+                await asyncio.sleep(0.001)

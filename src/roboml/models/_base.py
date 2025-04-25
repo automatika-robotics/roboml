@@ -1,6 +1,7 @@
 from logging import Logger
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Optional
+from asyncio import AbstractEventLoop
 
 import torch
 from roboml.utils import Status
@@ -15,8 +16,10 @@ class ModelTemplate:
         self.device: str = "cuda" if torch.cuda.is_available() else "cpu"
         self.model: Any = None
         self.pre_processor: Any = None
+        self.stream: bool = False
         self.status: Status = Status.LOADED
         self.logger = logger
+        self.loop: Optional[AbstractEventLoop] = None
 
     @abstractmethod
     def _initialize(self, *_, **__) -> None:
@@ -29,7 +32,7 @@ class ModelTemplate:
         )
 
     @abstractmethod
-    def _inference(self, *_, **__) -> dict:
+    def _inference(self, *_, **__) -> Any:
         """Model specific inference function, to be implemented in derived classes.
         :rtype: dict
         """

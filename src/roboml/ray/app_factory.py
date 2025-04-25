@@ -6,7 +6,7 @@ from ray import available_resources, serve
 from roboml import databases, models
 from roboml.ray import app, ingress_decorator
 from roboml.ray.node import RayHTTPNode
-from roboml.utils import logger, logging
+from roboml.utils import logger
 
 
 @serve.deployment()
@@ -95,9 +95,7 @@ class AppFactory:
             },
         )
         # Initialize node
-        deployment_app = deployment.bind(
-            name=node_name, model=module(logger=logging.getLogger(node_name))
-        )
+        deployment_app = deployment.bind(name=node_name, model=module)
         self.app_dict[node_name] = deployment_app
         serve.run(deployment_app, name=node_name, route_prefix=f"/{node_name}")
 

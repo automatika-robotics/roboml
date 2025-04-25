@@ -70,7 +70,7 @@ class LLMInput(TextInput):
     Input values for LLM inference
     """
 
-    max_new_tokens: int = Field(
+    max_length: int = Field(
         title="Maximum number of new tokens to be generated", default=100
     )
     temperature: float = Field(

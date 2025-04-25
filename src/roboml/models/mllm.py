@@ -59,7 +59,6 @@ class TransformersMLLM(ModelTemplate):
         :param data:
         :param type: VLLMInput
         """
-        print(data)
         pil_images = pre_process_images_to_pil(data.images)
 
         # create prompt

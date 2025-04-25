@@ -1,19 +1,17 @@
-from typing import Optional, Union
+from typing import Optional, AsyncGenerator
 
-import numpy as np
 import torch
-from transformers import (
-    AutoProcessor,
-    AutoModelForVision2Seq,
-)
+from transformers import AutoProcessor, AutoModelForVision2Seq, TextIteratorStreamer
+
+from PIL.Image import Image
 
 from roboml.interfaces import VLLMInput
 from roboml.utils import get_quantization_config, pre_process_images_to_pil
 
-from ._base import ModelTemplate
+from .llm import TransformersLLM
 
 
-class TransformersMLLM(ModelTemplate):
+class TransformersMLLM(TransformersLLM):
     """
     Transformers model for VQA.
     """
@@ -31,6 +29,7 @@ class TransformersMLLM(ModelTemplate):
         checkpoint: str = "HuggingFaceM4/idefics2-8b",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
+        stream: bool = False,
     ) -> None:
         """Initialize Model.
 
@@ -43,6 +42,7 @@ class TransformersMLLM(ModelTemplate):
         :rtype: None
         """
         self.init_chat_prompt = system_prompt
+        self.stream = stream
         quantization_config = get_quantization_config(quantization, self.logger)
         self.model = AutoModelForVision2Seq.from_pretrained(
             checkpoint,
@@ -54,46 +54,47 @@ class TransformersMLLM(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
 
-    def _inference(self, data: VLLMInput) -> dict:
+    def _inference(self, data: VLLMInput) -> dict | AsyncGenerator:
         """Model inference.
         :param data:
         :param type: VLLMInput
         """
-        pil_images = pre_process_images_to_pil(data.images)
+        pil_images: list[Image] = pre_process_images_to_pil(data.images)
 
         # create prompt
-        prompt = self.__create_prompt(data.query, data.images)
+        prompt = self.__create_prompt(data.query, len(data.images))
 
-        prompt = self.pre_processor.apply_chat_template(
-            prompt, add_generation_prompt=True
+        text = self.pre_processor.apply_chat_template(
+            prompt, tokenize=False, add_generation_prompt=True
         )
 
-        inputs = self.pre_processor(
-            images=pil_images, text=prompt, return_tensors="pt"
-        ).to(self.device)
-
-        with torch.no_grad():
-            generated_ids = self.model.generate(
-                **inputs,
-                do_sample=True,
-                temperature=data.temperature,
-                max_new_tokens=data.max_new_tokens,
+        if self.stream:
+            streamer = TextIteratorStreamer(
+                self.pre_processor,
+                timeout=0,
+                skip_prompt=True,
+                skip_special_tokens=True,
             )
+            self.loop.run_in_executor(
+                None,
+                self.generate_text,
+                text,
+                data.max_new_tokens,
+                data.temperature,
+                streamer,
+                pil_images,
+            )
+            return self.consume_streamer(streamer)
 
-        generated_text = self.pre_processor.batch_decode(
-            generated_ids, skip_special_tokens=True
-        )[0].strip()
+        input_ids, generated_ids = self.generate_text(
+            text, data.max_new_tokens, data.temperature, None, pil_images
+        )
 
-        output = generated_text.split("\nAssistant:")[-1].strip()
-        return {"output": output}
+        return self.decode_output(input_ids, generated_ids)
 
-    def __create_prompt(
-        self, query: list[dict], images: Union[list[np.ndarray], list[str]]
-    ) -> list:
+    def __create_prompt(self, query: list[dict], num_images: int) -> list:
         """
         Creates a prompt specific to the model.
-        :param      data:    Model Input
-        :type       data:    VLLMInput
         :returns:   Engineered Prompt
         :rtype:     list
         """
@@ -109,7 +110,7 @@ class TransformersMLLM(ModelTemplate):
             q["content"] = [{"type": "text", "text": q["content"]}]
 
         # Add image tags to last message
-        image_tags = [{"type": "image"} for _ in range(len(images))]
+        image_tags = [{"type": "image"} for _ in range(num_images)]
         last_query = image_tags + [{"type": "text", "text": query[-1]["content"]}]
         query[-1]["content"] = last_query
 

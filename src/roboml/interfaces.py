@@ -26,24 +26,12 @@ class AudioInput(BaseModel):
     query: Union[str, bytes] = Field(title="Audio input raw bytes", min_length=1)
 
 
-class ImageInput(BaseModel):
-    """
-    Input values for image inference
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    images: Union[list[str], list[np.ndarray]] = Field(
-        title="List of images as base64 strings or numpy arrays", min_length=1
-    )
-
-
 class TextInput(BaseModel):
     """
     Input values for text inference
     """
 
-    query: Union[str, list[dict]] = Field(title="Input to the model", min_length=1)
+    query: list[dict] = Field(title="Input to the model", min_length=1)
 
 
 class TextToSpeechInput(TextInput):
@@ -70,7 +58,7 @@ class LLMInput(TextInput):
     Input values for LLM inference
     """
 
-    max_length: int = Field(
+    max_new_tokens: int = Field(
         title="Maximum number of new tokens to be generated", default=100
     )
     temperature: float = Field(
@@ -78,17 +66,26 @@ class LLMInput(TextInput):
     )
 
 
-class VLLMInput(ImageInput, LLMInput):
+class VLLMInput(LLMInput):
     """
     Input values for multi modal LLM inference
     """
 
-    pass
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    images: Union[list[str], list[np.ndarray]] = Field(
+        title="List of images as base64 strings or numpy arrays", min_length=1
+    )
 
 
-class DetectionInput(ImageInput):
+class DetectionInput(BaseModel):
     """Input for Detection models."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    images: Union[list[str], list[np.ndarray]] = Field(
+        title="List of images as base64 strings or numpy arrays", min_length=1
+    )
     threshold: float = Field(title="Detection confidence threshold", default=0.5)
     get_dataset_labels: bool = Field(
         title="Get dataset label string names", default=True

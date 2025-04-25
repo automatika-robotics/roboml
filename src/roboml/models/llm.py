@@ -3,6 +3,7 @@ from queue import Empty
 import asyncio
 
 import torch
+from PIL.Image import Image
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 
 from roboml.interfaces import LLMInput
@@ -20,6 +21,7 @@ class TransformersLLM(ModelTemplate):
         """__init__.
         :param kwargs:
         """
+
         super().__init__(**kwargs)
         # init chat prompt
         self.init_chat_prompt: Optional[str] = None
@@ -77,33 +79,25 @@ class TransformersLLM(ModelTemplate):
                 None,
                 self.generate_text,
                 text,
-                data.max_length,
+                data.max_new_tokens,
                 data.temperature,
                 streamer,
             )
             return self.consume_streamer(streamer)
 
         input_ids, generated_ids = self.generate_text(
-            text, data.max_length, data.temperature, None
+            text, data.max_new_tokens, data.temperature, None
         )
 
-        generated_ids = [
-            output_ids[len(input_ids) :]
-            for input_ids, output_ids in zip(input_ids, generated_ids, strict=True)
-        ]
-
-        generated_text = self.pre_processor.batch_decode(
-            generated_ids, skip_special_tokens=True
-        )[0].strip()
-
-        return {"output": generated_text}
+        return self.decode_output(input_ids, generated_ids)
 
     def generate_text(
         self,
         text: str,
-        max_length: int,
+        max_new_tokens: int,
         temperature: float,
         streamer: Optional[TextIteratorStreamer],
+        images: Optional[list[Image]] = None,
     ):
         input_ids = self.pre_processor([text], return_tensors="pt").input_ids.to(
             self.device
@@ -112,12 +106,27 @@ class TransformersLLM(ModelTemplate):
             generated_ids = self.model.generate(
                 input_ids,
                 streamer=streamer,
-                max_length=max_length,
+                max_new_tokens=max_new_tokens,
                 do_sample=True,
                 temperature=temperature,
+                images=images,
             )
         if not streamer:
             return input_ids, generated_ids
+
+    def decode_output(self, input_ids, generated_ids):
+        # Remove prompt tokens
+        generated_ids = [
+            output_ids[len(input_ids) :]
+            for input_ids, output_ids in zip(input_ids, generated_ids, strict=True)
+        ]
+
+        # Decode to get text
+        generated_text = self.pre_processor.batch_decode(
+            generated_ids, skip_special_tokens=True
+        )[0].strip()
+
+        return {"output": generated_text}
 
     async def consume_streamer(self, streamer: TextIteratorStreamer):
         while True:

@@ -40,7 +40,7 @@ dependencies = [
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
-dev = ["httpx", "pip-tools", "pytest", "pre-commit", "black", "redis"]
+dev = ["httpx", "pip-tools", "pytest", "pre-commit", "redis"]
 vision = ["mmengine", "platformdirs", "norfair", "mmdeploy==1.3.1 ; platform_machine == 'x86_64'", "mmdeploy-runtime-gpu==1.3.1 ; platform_machine == 'x86_64'", "pycuda", "opencv-python-headless"]
 
 [project.scripts]

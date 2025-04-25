@@ -6,8 +6,10 @@ import inspect
 import pytest
 import cv2
 from roboml import models
+from roboml.models.vision import VisionModel
 from roboml.models._base import ModelTemplate
 from roboml.interfaces import (
+    LLMInput,
     VLLMInput,
     DetectionInput,
     SpeechToTextInput,
@@ -32,6 +34,8 @@ def models_in_module(request):
     if not module:
         return None
     module = module.args[0]
+    if module == "vision":
+        return [VisionModel]
     module = getattr(models, module)
     return [
         model_class
@@ -56,20 +60,32 @@ def run_models(models_in_module, inputs, log_output=False):
             logging.info("--- %s seconds ---" % (time.time() - start_time))
 
 
+@pytest.mark.module("llm")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_llms(models_in_module):
+    """
+    Test vllms
+    """
+    data = {
+        "query": [{"role": "user", "content": "Whats up?"}],
+    }
+    input = LLMInput(**data)
+    inputs = [input]
+    run_models(models_in_module, inputs, log_output=True)
+
+
 @pytest.mark.module("mllm")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_vllms(loaded_img, models_in_module):
     """
     Test vllms
     """
-    inputs = []
     data = {
         "query": [{"role": "user", "content": "What do you see?"}],
         "images": [loaded_img],
-        "chat_history": True,
     }
-    inputs.append(VLLMInput(**data))
-    inputs.append(VLLMInput(query="How is it made?", images=[loaded_img]))
+    input = VLLMInput(**data)
+    inputs = [input]
     run_models(models_in_module, inputs, log_output=True)
 
 

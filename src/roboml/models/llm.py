@@ -99,20 +99,22 @@ class TransformersLLM(ModelTemplate):
         streamer: Optional[TextIteratorStreamer],
         images: Optional[list[Image]] = None,
     ):
-        input_ids = self.pre_processor([text], return_tensors="pt").input_ids.to(
-            self.device
-        )
+        input = (
+            self.pre_processor(text=text, return_tensors="pt")
+            if not images
+            else self.pre_processor(text=text, images=images, return_tensors="pt")
+        ).to(self.device)
+        # input_ids = input.input_ids.to(self.device)
         with torch.no_grad():
             generated_ids = self.model.generate(
-                input_ids,
+                **input,
                 streamer=streamer,
                 max_new_tokens=max_new_tokens,
                 do_sample=True,
                 temperature=temperature,
-                images=images,
             )
         if not streamer:
-            return input_ids, generated_ids
+            return input.input_ids, generated_ids
 
     def decode_output(self, input_ids, generated_ids):
         # Remove prompt tokens

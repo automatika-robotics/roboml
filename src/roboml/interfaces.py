@@ -18,29 +18,22 @@ class NodeDeinit(BaseModel):
 
 
 # IO Interfaces
+class TextToSpeechInput(BaseModel):
+    """
+    Input values for text to speech inference
+    """
+
+    query: str = Field(title="Query string")
+    voice: Optional[str] = Field(title="Voice to use", default=None)
+    get_bytes: bool = Field(title="Get raw audio bytes", default=False)
+
+
 class AudioInput(BaseModel):
     """
     Input values for audio inference
     """
 
     query: Union[str, bytes] = Field(title="Audio input raw bytes", min_length=1)
-
-
-class TextInput(BaseModel):
-    """
-    Input values for text inference
-    """
-
-    query: list[dict] = Field(title="Input to the model", min_length=1)
-
-
-class TextToSpeechInput(TextInput):
-    """
-    Input values for text to speech inference
-    """
-
-    voice: Optional[str] = Field(title="Voice to use", default=None)
-    get_bytes: bool = Field(title="Get raw audio bytes", default=False)
 
 
 class SpeechToTextInput(AudioInput):
@@ -51,6 +44,14 @@ class SpeechToTextInput(AudioInput):
     max_new_tokens: int = Field(
         title="Maximum number of new tokens to be generated", default=128
     )
+
+
+class TextInput(BaseModel):
+    """
+    Input values for text inference
+    """
+
+    query: list[dict] = Field(title="Input to the model", min_length=1)
 
 
 class LLMInput(TextInput):

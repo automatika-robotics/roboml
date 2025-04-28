@@ -60,14 +60,12 @@ class TransformersMLLM(TransformersLLM):
         :param type: VLLMInput
         """
         pil_images: list[Image] = pre_process_images_to_pil(data.images)
-
         # create prompt
         prompt = self.__create_prompt(data.query, len(data.images))
 
         text = self.pre_processor.apply_chat_template(
-            prompt, tokenize=False, add_generation_prompt=True
+            prompt, add_generation_prompt=True
         )
-
         if self.stream:
             streamer = TextIteratorStreamer(
                 self.pre_processor,

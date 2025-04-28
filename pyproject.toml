@@ -20,6 +20,7 @@ classifiers = [
 keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learning"]
 
 dependencies = [
+    "torch<=2.4",
     "accelerate",
     "transformers",
     "bitsandbytes ; platform_machine == 'x86_64'",

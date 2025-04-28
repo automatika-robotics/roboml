@@ -4,7 +4,6 @@ import torch
 from datasets import arrow_dataset, load_dataset
 from transformers import (
     AutoProcessor,
-    BarkModel,
     SpeechT5ForTextToSpeech,
     SpeechT5HifiGan,
 )
@@ -13,49 +12,6 @@ from roboml.interfaces import TextToSpeechInput
 from roboml.utils import post_process_audio
 
 from ._base import ModelTemplate
-
-
-class Bark(ModelTemplate):
-    """
-    Bark TTS model for text to audio (by Suno AI)
-    """
-
-    def _initialize(
-        self,
-        checkpoint: str = "suno/bark-small",
-        attn_implementation: Optional[str] = "flash_attention_2",
-        voice: str = "v2/en_speaker_6",
-    ) -> None:
-        """
-        Initializes the model.
-        """
-        self.model = BarkModel.from_pretrained(
-            checkpoint,
-            torch_dtype=torch.float16,
-            attn_implementation=attn_implementation,
-        ).to(self.device)
-        self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
-        self.voice = voice
-
-    def _inference(self, data: TextToSpeechInput) -> dict:
-        """Model Inference.
-        :param data:
-        :type data: TextToSpeechInput
-        :rtype: dict
-        """
-        voice = data.voice or self.voice
-        # Speaker embedding loaded along with input
-        inputs = self.pre_processor(text=data.query, voice_preset=voice).to(self.device)
-
-        # generate speech
-        speech = self.model.generate(**inputs, semantic_max_new_tokens=500)
-        # get bytes
-        sample_rate = self.model.generation_config.sample_rate
-        audio = post_process_audio(
-            speech, sample_rate=sample_rate, get_bytes=data.get_bytes
-        )
-
-        return {"output": audio}
 
 
 class SpeechT5(ModelTemplate):

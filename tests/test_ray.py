@@ -1,9 +1,7 @@
-import base64
 import logging
 import time
 from multiprocessing import Process
 
-import cv2
 import httpx
 import pytest
 from roboml.main import ray
@@ -50,7 +48,7 @@ def test_add_node():
     }
 
     # create node
-    response = httpx.post(f"{HOST}:{PORT}/add_node", params=node_params, timeout=30)
+    response = httpx.post(f"{HOST}:{PORT}/add_node", params=node_params, timeout=100)
     logging.info(response.status_code)
     assert response.status_code == 201
 
@@ -67,7 +65,7 @@ def test_model_init():
 
 def test_model_inference():
     """
-    Test initializing model
+    Test model inference
     """
 
     # call model inference

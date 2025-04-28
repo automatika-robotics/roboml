@@ -4,7 +4,6 @@ import pytest
 from multiprocessing import Process, set_start_method
 from redis import Redis
 import time
-import cv2
 import logging
 
 from roboml.main import resp

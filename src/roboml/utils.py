@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import yaml
 from PIL import Image as PILImage
-from pkg_resources import get_distribution
+from importlib.metadata import distribution, PackageNotFoundError
 from scipy.io.wavfile import write
 
 from roboml.tools.download import DownloadManager
@@ -280,21 +280,21 @@ def _get_mmdet_package_info() -> Path:
     :rtype: Path
     """
     # get location of mmdet package
-    package = get_distribution("mmdet")
-    if not package.location:
+    try:
+        package = distribution("mmdet")
+        location = Path(str(package.locate_file("")))
+    except PackageNotFoundError:
         logger.error(
             "MMDetection does not seem to be installed. Please install it to run object detection models."
         )
-        raise Exception
-    package_path = Path(package.location) / Path("mmdet")
-    if not package_path.exists():
-        logger.error(
-            "MMDetection does not seem to be installed. Please install it to run object detection models."
-        )
-        raise Exception
-
+        raise
     # return mim path for the mmdet package
-    mim_path = package_path / Path(".mim")
+    mim_path = location / Path("mmdet") / Path(".mim")
+    if not mim_path.exists():
+        logger.error(
+            "MMDetection does not seem to be installed. Please install it to run object detection models."
+        )
+        raise PackageNotFoundError
     return mim_path
 
 

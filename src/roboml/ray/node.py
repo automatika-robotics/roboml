@@ -1,8 +1,16 @@
 from logging import Logger
 import asyncio
 
-from pydantic import ValidationError, validate_call
-from fastapi import HTTPException, Response
+import msgpack_numpy as m_pack
+import msgpack
+from pydantic import BaseModel, ValidationError, validate_call
+from fastapi import (
+    HTTPException,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+)
 from starlette.responses import StreamingResponse
 import inspect
 
@@ -10,9 +18,12 @@ from . import app, ingress_decorator
 from roboml.models import ModelTemplate
 from roboml.utils import Status, logging
 
+# patch msgpack for numpy
+m_pack.patch()
+
 
 @ingress_decorator
-class RayHTTPNode:
+class RayNode:
     """
     This class describes a node that gets deployed as a ray app.
     """
@@ -25,6 +36,7 @@ class RayHTTPNode:
         self.logger: Logger = logging.getLogger(self.name)
         self.model: ModelTemplate = model(logger=self.logger)
         self.model.loop = asyncio.get_running_loop()
+        self.data_model: type[BaseModel] = BaseModel
 
     @app.post("/initialize")
     def initialize(self, body: dict | None = None) -> None:
@@ -41,6 +53,12 @@ class RayHTTPNode:
                 validated_init(**body)
             else:
                 self.model._initialize()
+
+            # Get data model for checking during inference
+            self.data_model = (
+                inspect.signature(self.model._inference).parameters["data"].annotation
+            )
+
         except Exception as e:
             self.logger.error(f"Initialization Error: {e}")
             self.model.status = Status.INITIALIZATION_ERROR
@@ -62,19 +80,43 @@ class RayHTTPNode:
             )
         # verify model input
         try:
-            data_model = (
-                inspect.signature(self.model._inference).parameters["data"].annotation
-            )
-            data = data_model(**body)
+            data = self.data_model(**body)
         except ValidationError as e:
             self.logger.error("Validation Error occured for inference input")
             raise HTTPException(status_code=400, detail=e.errors()) from e
         result = self.model._inference(data)
         # Send streaming response if set in the model
         if self.model.stream:
-            # TODO: Change media type based on model
-            return StreamingResponse(result, media_type="text/plain")
+            return StreamingResponse(result, media_type="application/octet-stream")
         return result
+
+    @app.websocket("/ws_inference")
+    async def handle_request(self, ws: WebSocket) -> None:
+        await ws.accept()
+        try:
+            while True:
+                raw_data = await ws.receive_bytes()
+                data_dict = msgpack.unpackb(raw_data)
+                # verify model input
+                data = self.data_model(**data_dict)
+                result = self.model._inference(data)
+
+                if self.model.stream:
+                    async for res in result:
+                        await ws.send_bytes(res)
+                    await ws.send_bytes(b"\r\n")
+                else:
+                    raw_data = msgpack.packb(result)
+                    await ws.send_bytes(raw_data)
+
+        except ValidationError as e:
+            self.logger.error("Validation Error occured for inference input")
+            raise WebSocketException(code=1007, reason=f"{e.errors()}") from e
+        except WebSocketDisconnect:
+            self.logger.info("Websocket client disconnected.")
+        except Exception as e:
+            self.logger.error(f"Unknown exception: {e}")
+            raise WebSocketException(code=1007, reason=f"{e}") from e
 
     @app.get("/get_status")
     def get_status(self):

@@ -11,7 +11,7 @@ from roboml.main import ray
 HOST = "localhost"
 PORT = 8000
 MODEL_NAME = "test"
-MODEL_TYPE = "TransformersLLM"
+MODEL_TYPE = "SpeechT5"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -61,10 +61,7 @@ def test_model_init():
     Test initializing model
     """
     # init model with default params
-    params = {"stream": True}
-    response = httpx.post(
-        f"http://{HOST}:{PORT}/{MODEL_NAME}/initialize", json=params, timeout=600
-    )
+    response = httpx.post(f"http://{HOST}:{PORT}/{MODEL_NAME}/initialize", timeout=600)
     logging.info(response.status_code)
     assert response.status_code == 200
 
@@ -75,13 +72,12 @@ def test_model_inference():
     """
 
     # call model inference
-    body = {"query": [{"role": "user", "content": "Whats up?"}]}
+    body = {"query": "This should be said out loud"}
     response = httpx.post(
         f"http://{HOST}:{PORT}/{MODEL_NAME}/inference", json=body, timeout=30
     )
-    for chunk in response.iter_text(chunk_size=None):
-        logging.info(chunk)
     assert response.status_code == 200
+    assert response.json().get("output")
 
 
 def test_ws_model_inference():
@@ -91,17 +87,12 @@ def test_ws_model_inference():
 
     # call model inference
     with connect(f"ws://{HOST}:{PORT}/{MODEL_NAME}/ws_inference") as websocket:
-        message = msgpack.packb({
-            "query": [{"role": "user", "content": "Space the final"}]
-        })
+        message = msgpack.packb({"query": "This should be said out loud"})
         websocket.send(message)
-        while True:
-            received = websocket.recv()
-            if received == "<<Response Finished>>":
-                break
-            logging.info(received)
+        received = websocket.recv()
+        received_dict = msgpack.unpackb(received)
 
-    assert received == "<<Response Finished>>"
+    assert received_dict.get("output")
 
 
 def test_remove_node():

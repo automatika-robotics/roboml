@@ -12,7 +12,7 @@ from roboml.main import resp
 m_pack.patch()
 
 
-MODEL_TYPE = "TransformersLLM"
+MODEL_TYPE = "SpeechT5"
 MODEL_NAME = "test"
 
 
@@ -75,7 +75,7 @@ def test_model_inference():
     """
     # call model inference
     r = Redis("localhost", port=6379)
-    body = {"query": [{"role": "user", "content": "Whats up?"}]}
+    body = {"query": "This should be spoken out loud"}
     body = msgpack.packb(body)
     response = r.execute_command(f"{MODEL_NAME}.inference", body)
     response = msgpack.unpackb(response)

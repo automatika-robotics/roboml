@@ -12,7 +12,7 @@ import uvicorn
 from hiredis import Reader
 from pydantic import ValidationError, validate_call
 
-from roboml import databases, models
+from roboml import models
 from roboml.resp_server.stream import StreamReader
 from roboml.resp_server.node import RESPNode
 from roboml.utils import is_background_task, logging
@@ -125,12 +125,10 @@ class Server:
                     "In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection as explained here, https://github.com/automatika-robotics/robml"
                 ) from e
             module = VisionModel
-        elif hasattr(databases, node_model):
-            module = getattr(databases, node_model)
         else:
             self.logger.error(f"Requested node class {node_model} does not exist")
             raise ModuleNotFoundError(
-                f"{node_model} is not a supported model/vectordb type in roboml library. Please use an available model/vectordb type or use another client."
+                f"{node_model} is not a supported model type in roboml library. Please use an available model type or use another client."
             )
 
         # Initialize node

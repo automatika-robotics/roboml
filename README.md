@@ -12,9 +12,8 @@
 
 RoboML is an aggregator package written for quickly deploying open source ML models for robots. It is designed to cover two basic use cases.
 
-- **Readily deploy various useful models:** The package provides a wrapper around the 🤗 [**Transformers**](https://github.com/huggingface/transformers) and [**SentenceTransformers**](https://www.sbert.net/) libraries. Pretty much all relevant open source models from these libraries can be quickly deployed behind a highly scalable server endpoint.
+- **Readily deploy various useful models:** The package provides a wrapper around useful ML libraries such as 🤗 [**Transformers**](https://github.com/huggingface/transformers). Pretty much all relevant open source models from these libraries can be quickly deployed behind a highly scalable server endpoint.
 - **Deploy Detection Models with Tracking**: With RoboML one can deploy all detection models available in [**MMDetection**](https://github.com/open-mmlab/mmdetection). An open source vision model aggregation library. These detection models can also be seemlesly used for tracking.
-- **Use Open Source Vector DBs**: RoboML provides a unified interface for deploying Vector DBs along with ML models. Currently it is packaged with [**ChromaDB**](https://www.trychroma.com/) an open source multimodal vector database.
 - **Aggregate robot specific ML models from the Robotics community**: RoboML aims to be an aggregator package of models trained by the robotics community. These models can range from Multimodal LLMs, vision models, or robot action models, and can be used with ROS based functional components. See the usage in [ROS Agents](https://automatika-robotics.github.io/ros-agents)
 
 ## Installation

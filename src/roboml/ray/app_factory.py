@@ -1,11 +1,11 @@
-from typing import Optional, Literal
+from typing import Optional
 
 from fastapi import HTTPException
 from ray import available_resources, serve
 
-from roboml import databases, models
+from roboml import models
 from roboml.ray import app, ingress_decorator
-from roboml.ray.node import RayHTTPNode
+from roboml.ray.node import RayNode
 from roboml.utils import logger
 
 
@@ -37,14 +37,12 @@ class AppFactory:
         }
 
     @app.post("/add_node", status_code=201)
-    def add_node(
-        self, node_name: str, node_type: Literal["HTTP", "websocket"], node_model: str
-    ) -> dict:
-        """Add a model or database node.
+    def add_node(self, node_name: str, node_model: str) -> dict:
+        """Add a model node.
 
         :param node_name:
         :type node_name: str
-        :param node_type:
+        :param node_model:
         :rtype: dict
         """
 
@@ -72,23 +70,16 @@ class AppFactory:
                     detail="In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection following instructions given on this link, https://github.com/automatika-robotics/robml",
                 ) from e
             module = VisionModel
-        elif hasattr(databases, node_model):
-            module = getattr(databases, node_model)
         else:
-            logger.error(f"Requested node class {node_type} does not exist")
+            logger.error(f"Requested node class {node_model} does not exist")
             raise HTTPException(
                 status_code=400,
-                detail=f"{node_model} is not a supported model/vectordb type in roboml library. Please use an available model/vectordb type or use another client.",
+                detail=f"{node_model} is not a supported model type in roboml library. Please use an available model type or use another client.",
             )
-
-        if node_type == "HTTP":
-            node_class = RayHTTPNode
-        else:
-            node_class = RayHTTPNode
 
         # Create a deployment
         deployment = serve.deployment(
-            node_class,
+            RayNode,
             ray_actor_options={
                 "num_cpus": 1 / self.nodes_per_cpu,
                 "num_gpus": 1 / self.nodes_per_gpu,
@@ -104,7 +95,7 @@ class AppFactory:
 
     @app.post("/remove_node", status_code=202)
     def remove_node(self, node_name: str) -> dict:
-        """Remove a model or database node.
+        """Remove a model node.
 
         :param node_name:
         :type node_name: str

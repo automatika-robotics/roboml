@@ -29,11 +29,8 @@ dependencies = [
     "msgpack_numpy",
     "hiredis",
     "ray[serve]",
-    "sentencepiece",
     "datasets",
     "scipy",
-    "sentence-transformers",
-    "chromadb",
     "ninja",
     "packaging",
     "ctranslate2<=4.4",  # for torch<=2.4

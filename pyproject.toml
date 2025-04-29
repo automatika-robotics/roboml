@@ -20,7 +20,7 @@ classifiers = [
 keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learning"]
 
 dependencies = [
-    "torch<=2.4",
+    "torch<=2.4",  # for mmcv==2.1 and mmdetection
     "accelerate",
     "transformers",
     "bitsandbytes ; platform_machine == 'x86_64'",
@@ -36,6 +36,8 @@ dependencies = [
     "chromadb",
     "ninja",
     "packaging",
+    "ctranslate2<=4.4",  # for torch<=2.4
+    "faster-whisper"
 ]
 
 requires-python = ">=3.10"

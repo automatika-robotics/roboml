@@ -33,7 +33,11 @@ class AudioInput(BaseModel):
     Input values for audio inference
     """
 
-    query: Union[str, bytes] = Field(title="Audio input raw bytes", min_length=1)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    query: Union[str, bytes, np.ndarray] = Field(
+        title="Audio input raw bytes", min_length=1
+    )
 
 
 class SpeechToTextInput(AudioInput):
@@ -41,8 +45,8 @@ class SpeechToTextInput(AudioInput):
     Input values for speech to text inference
     """
 
-    max_new_tokens: int = Field(
-        title="Maximum number of new tokens to be generated", default=128
+    max_new_tokens: Optional[int] = Field(
+        title="Maximum number of new tokens to be generated", default=None
     )
 
 

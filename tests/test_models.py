@@ -2,9 +2,9 @@ import time
 import base64
 import logging
 import inspect
-
 import pytest
 import cv2
+
 from roboml import models
 from roboml.models.vision import VisionModel
 from roboml.models._base import ModelTemplate
@@ -106,11 +106,9 @@ def test_speech_to_text(models_in_module):
     """
     Test speech to text
     """
-    with open("tests/resources/test.wav", "rb") as file:
-        file_bytes = file.read()
-    data = {"query": file_bytes, "max_new_tokens": 100}
+    data = {"query": "tests/resources/test.wav", "max_new_tokens": None}
     inputs = [SpeechToTextInput(**data)]
-    run_models(models_in_module, inputs)
+    run_models(models_in_module, inputs, log_output=True)
 
 
 @pytest.mark.module("vision")

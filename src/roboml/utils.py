@@ -84,7 +84,7 @@ def post_process_audio(
     :rtype:     str
     """
     # create numpy array
-    np_data = data.cpu().detach().numpy().squeeze().astype(np.float32)
+    np_data = data.detach().numpy().squeeze().astype(np.float32)
 
     # open buffer and write to it with hard coded sampling rate
     bytes_wav = bytes()

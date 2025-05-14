@@ -55,7 +55,7 @@ class Bark(ModelTemplate):
         # get bytes
         sample_rate = self.model.generation_config.sample_rate
         audio = post_process_audio(
-            speech, sample_rate=sample_rate, get_bytes=data.get_bytes
+            speech.cpu(), sample_rate=sample_rate, get_bytes=data.get_bytes
         )
 
         return {"output": audio}
@@ -94,9 +94,15 @@ class SpeechT5(ModelTemplate):
         self.vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan").to(
             self.device
         )
-        self.speaker_dataset = load_dataset(
-            self.speaker_dataset_vects, split="validation"
-        )
+        # Load speaker embeddings (consider caching this locally if network is slow)
+        try:
+            self.speaker_dataset = load_dataset(
+                self.speaker_dataset_vects, split="validation"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to load speaker dataset: {e}")
+            self.speaker_dataset = None  # Handle gracefully in inference
+
         self.voice = voice
 
     def _inference(self, data: TextToSpeechInput) -> dict:
@@ -110,12 +116,12 @@ class SpeechT5(ModelTemplate):
         )
 
         voice = data.voice or self.voice
+
         # load speaker embeddings
-        speaker_embeddings: torch.FloatTensor = (
-            torch.tensor(self.speaker_dataset[self.speakers[voice]]["xvector"])
-            .unsqueeze(0)
-            .to(self.device)
-        )
+        speaker_embeddings = self._get_speaker_embedding(voice)
+
+        if speaker_embeddings is None:
+            raise Exception(f"Failed to load speaker embedding for voice '{voice}'.")
 
         # generate speech with the model
         with torch.no_grad():
@@ -124,6 +130,35 @@ class SpeechT5(ModelTemplate):
             )
 
         # get bytes
-        audio = post_process_audio(speech, get_bytes=data.get_bytes)
+        audio = post_process_audio(speech.cpu(), get_bytes=data.get_bytes)
 
         return {"output": audio}
+
+    def _get_speaker_embedding(self, speaker_id: str) -> Optional[torch.Tensor]:
+        """Safely retrieves speaker embedding tensor."""
+        if self.speaker_dataset is None:
+            self.logger.error(
+                "Speaker dataset not loaded. Cannot provide speaker embeddings."
+            )
+            return None
+        try:
+            speaker_idx = self.speakers[speaker_id]
+            embedding = torch.tensor(
+                self.speaker_dataset[speaker_idx]["xvector"], dtype=torch.float32
+            )  # Embeddings usually float32
+            return embedding.unsqueeze(0).to(
+                self.device
+            )  # Add batch dim and move to device
+        except KeyError:
+            self.logger.warning(f"Speaker ID '{speaker_id}' not found in speaker map.")
+            return None
+        except IndexError:
+            self.logger.warning(
+                f"Speaker index for '{speaker_id}' out of bounds for the loaded dataset."
+            )
+            return None
+        except Exception as e:
+            self.logger.error(
+                f"Error loading speaker embedding for '{speaker_id}': {e}"
+            )
+            return None

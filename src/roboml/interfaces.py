@@ -4,19 +4,6 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class NodeInit(BaseModel):
-    """NodeInit."""
-
-    node_name: str
-    node_type: str
-
-
-class NodeDeinit(BaseModel):
-    """NodeDeinit."""
-
-    node_name: str
-
-
 # IO Interfaces
 class TextToSpeechInput(BaseModel):
     """

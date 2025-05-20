@@ -15,9 +15,9 @@ class TextToSpeechInput(BaseModel):
     get_bytes: bool = Field(title="Get raw audio bytes", default=False)
 
 
-class AudioInput(BaseModel):
+class SpeechToTextInput(BaseModel):
     """
-    Input values for audio inference
+    Input values for speech to text inference
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -25,15 +25,34 @@ class AudioInput(BaseModel):
     query: Union[str, bytes, np.ndarray] = Field(
         title="Audio input raw bytes", min_length=1
     )
-
-
-class SpeechToTextInput(AudioInput):
-    """
-    Input values for speech to text inference
-    """
-
     max_new_tokens: Optional[int] = Field(
         title="Maximum number of new tokens to be generated", default=None
+    )
+
+
+class LLMInput(BaseModel):
+    """
+    Input values for LLM inference
+    """
+
+    query: list[dict] = Field(title="Input to the model", min_length=1)
+    max_new_tokens: int = Field(
+        title="Maximum number of new tokens to be generated", default=100
+    )
+    temperature: float = Field(
+        title="Temperature with which inference is to be generated", default=0.7
+    )
+
+
+class VLLMInput(LLMInput):
+    """
+    Input values for multi modal LLM inference
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    images: Union[list[str], list[np.ndarray]] = Field(
+        title="List of images as base64 strings or numpy arrays", min_length=1
     )
 
 

@@ -87,11 +87,12 @@ class RayNode:
         result = self.model._inference(data)
         # Send streaming response if set in the model
         if self.model.stream:
-            return StreamingResponse(result, media_type="application/octet-stream")
+            return StreamingResponse(result, media_type="text/plain")
         return result
 
     @app.websocket("/ws_inference")
     async def handle_request(self, ws: WebSocket) -> None:
+        """Websockets endpoint that streams text data for text generation models"""
         await ws.accept()
         try:
             while True:
@@ -103,11 +104,10 @@ class RayNode:
 
                 if self.model.stream:
                     async for res in result:
-                        await ws.send_bytes(res)
-                    await ws.send_bytes(b"\r\n")
+                        await ws.send_text(res)
+                    await ws.send_text("<<Response Ended>>")
                 else:
-                    raw_data = msgpack.packb(result)
-                    await ws.send_bytes(raw_data)
+                    await ws.send_bytes(msgpack.packb(result))
 
         except ValidationError as e:
             self.logger.error("Validation Error occured for inference input")

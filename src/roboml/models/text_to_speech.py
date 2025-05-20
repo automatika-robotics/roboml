@@ -121,7 +121,7 @@ class SpeechT5(ModelTemplate):
         speaker_embeddings = self._get_speaker_embedding(voice)
 
         if speaker_embeddings is None:
-            raise Exception(f"Failed to load speaker embedding for voice '{voice}'.")
+            raise ValueError(f"Failed to load speaker embedding for voice '{voice}'.")
 
         # generate speech with the model
         with torch.no_grad():
@@ -162,3 +162,121 @@ class SpeechT5(ModelTemplate):
                 f"Error loading speaker embedding for '{speaker_id}': {e}"
             )
             return None
+
+
+class MeloTTS(ModelTemplate):
+    """
+    MeloTTS model for text to audio (by MyShell AI).
+    Uses the official melo.api.TTS class.
+    """
+
+    # Based on common MeloTTS models
+    supported_languages: list = ["EN", "ES", "FR", "ZH", "JP", "KR"]
+
+    def _initialize(
+        self,
+        language: str = "EN",  # Default language
+        speaker_id: str = "EN-US",  # Default speaker for English
+    ) -> None:
+        """
+        Initialize model. Downloads models automatically on first use if needed via load_or_download functions used internally by MeloTTS.
+        """
+        try:
+            # The TTS class from api.py is typically imported as MeloTTS via melo.api
+            from melo.api import TTS as MeloTTSModel
+
+        except ModuleNotFoundError as e:
+            self.logger.error(
+                """MeloTTS library is not install. It can be installed as follows:
+                              - pip install git+https://github.com/myshell-ai/MeloTTS.git
+                              - python -m unidic download
+                              """,
+                exc_info=True,
+            )
+            raise ModuleNotFoundError("""MeloTTS library is not install. It can be installed as follows:
+                              - pip install git+https://github.com/myshell-ai/MeloTTS.git
+                              - python -m unidic download""") from e
+
+        if language not in self.supported_languages:
+            self.logger.warning(
+                f"Language '{language}' might not be officially supported by this wrapper. Supported: {self.supported_languages}. Trying anyway."
+            )
+
+        self.language = language  # Store language used for init
+        self.default_speaker_key = speaker_id  # Store the key (e.g., "EN-US")
+
+        self.logger.info(
+            f"Initializing MeloTTS for language '{language}' on device '{self.device}'..."
+        )
+        # Instantiate the TTS class from melo.api using parameters from api.py
+        self.model = MeloTTSModel(language=language, device=self.device)
+        self.speaker_ids = (
+            self.model.hps.data.spk2id
+        )  # Get speaker map from model's hps
+        self.logger.info(
+            f"Available speakers for {language}: {list(self.speaker_ids.keys())}"
+        )
+
+        # Validate default speaker ID
+        if self.default_speaker_key not in self.speaker_ids:
+            available_speakers = list(self.speaker_ids.keys())
+            fallback_speaker = available_speakers[0] if available_speakers else None
+            self.logger.warning(
+                f"Default speaker '{self.default_speaker_key}' not found for language '{self.language}'. "
+                f"Available: {available_speakers}. Falling back to '{fallback_speaker}'."
+            )
+            self.default_speaker_key = fallback_speaker
+        else:
+            self.logger.info(f"Default speaker set to: {self.default_speaker_key}")
+
+        if self.default_speaker_key is None:
+            raise ValueError(
+                f"No speakers available for language '{self.language}'. Cannot initialize."
+            )
+
+    def _inference(self, data: TextToSpeechInput) -> dict:
+        """Model Inference using MeloTTS.
+        Generates audio directly as a NumPy array by calling tts_to_file with
+        output_path=None, as supported by the API.
+
+        :param data: Input data containing text query and optional voice (speaker key).
+        :type data: TextToSpeechInput
+        :rtype: dict containing the audio output
+        """
+
+        text = data.query
+        # Use provided voice (speaker key) or the default for the initialized language
+        speaker_key = data.voice or self.default_speaker_key
+        self.logger.info(f"Using speaker key {speaker_key}")
+
+        # Get the internal speaker ID number expected by the model
+        sid = self.speaker_ids[speaker_key]
+        self.logger.info(f"Speaker ID {sid}")
+
+        try:
+            # Call tts_to_file with output_path=None to get audio directly
+            audio_np = self.model.tts_to_file(
+                text,
+                sid,
+                output_path=None,  # Get numpy array directly
+                speed=1.0,
+                quiet=True,
+            )
+
+            sample_rate = (
+                self.model.hps.data.sampling_rate
+            )  # Get sample rate from model's hps
+
+            # Post-process the audio tensor
+            output = post_process_audio(
+                audio_np,
+                sample_rate=sample_rate,
+                get_bytes=data.get_bytes,
+            )
+            return {"output": output}
+
+        except Exception as e:
+            self.logger.error(f"Error during MeloTTS inference: {e}", exc_info=True)
+            if "cuda" in self.device:
+                torch.cuda.empty_cache()
+            raise

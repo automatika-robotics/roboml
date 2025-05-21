@@ -31,7 +31,6 @@ class TransformersLLM(ModelTemplate):
         checkpoint: str = "microsoft/Phi-3-mini-4k-instruct",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
-        stream: bool = False,
     ) -> None:
         """Initialize Model.
 
@@ -44,7 +43,6 @@ class TransformersLLM(ModelTemplate):
         :rtype: None
         """
         self.init_chat_prompt = system_prompt
-        self.stream = stream
         quantization_config = get_quantization_config(quantization, self.logger)
         self.model = AutoModelForCausalLM.from_pretrained(
             checkpoint,
@@ -68,7 +66,7 @@ class TransformersLLM(ModelTemplate):
             data.query, tokenize=False, add_generation_prompt=True
         )
 
-        if self.stream:
+        if data.stream:
             streamer = TextIteratorStreamer(
                 self.pre_processor,
                 timeout=0,

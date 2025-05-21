@@ -29,7 +29,6 @@ class TransformersMLLM(TransformersLLM):
         checkpoint: str = "HuggingFaceM4/idefics2-8b",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
-        stream: bool = False,
     ) -> None:
         """Initialize Model.
 
@@ -42,7 +41,6 @@ class TransformersMLLM(TransformersLLM):
         :rtype: None
         """
         self.init_chat_prompt = system_prompt
-        self.stream = stream
         quantization_config = get_quantization_config(quantization, self.logger)
         self.model = AutoModelForVision2Seq.from_pretrained(
             checkpoint,
@@ -66,7 +64,7 @@ class TransformersMLLM(TransformersLLM):
         text = self.pre_processor.apply_chat_template(
             prompt, add_generation_prompt=True
         )
-        if self.stream:
+        if data.stream:
             streamer = TextIteratorStreamer(
                 self.pre_processor,
                 timeout=0,

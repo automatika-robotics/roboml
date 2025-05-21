@@ -42,6 +42,7 @@ class LLMInput(BaseModel):
     temperature: float = Field(
         title="Temperature with which inference is to be generated", default=0.7
     )
+    stream: bool = Field(title="Stream output response", default=False)
 
 
 class VLLMInput(LLMInput):

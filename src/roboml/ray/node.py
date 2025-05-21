@@ -1,5 +1,6 @@
 from logging import Logger
 import asyncio
+from typing import AsyncGenerator
 
 import msgpack_numpy as m_pack
 import msgpack
@@ -86,7 +87,7 @@ class RayNode:
             raise HTTPException(status_code=400, detail=e.errors()) from e
         result = self.model._inference(data)
         # Send streaming response if set in the model
-        if self.model.stream:
+        if isinstance(result, AsyncGenerator):
             return StreamingResponse(result, media_type="text/plain")
         return result
 
@@ -102,7 +103,7 @@ class RayNode:
                 data = self.data_model(**data_dict)
                 result = self.model._inference(data)
 
-                if self.model.stream:
+                if isinstance(result, AsyncGenerator):
                     async for res in result:
                         await ws.send_text(res)
                     await ws.send_text("<<Response Ended>>")

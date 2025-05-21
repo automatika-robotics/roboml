@@ -61,10 +61,7 @@ def test_model_init():
     Test initializing model
     """
     # init model with default params
-    params = {"stream": True}
-    response = httpx.post(
-        f"http://{HOST}:{PORT}/{MODEL_NAME}/initialize", json=params, timeout=600
-    )
+    response = httpx.post(f"http://{HOST}:{PORT}/{MODEL_NAME}/initialize", timeout=600)
     logging.info(response.status_code)
     assert response.status_code == 200
 
@@ -92,7 +89,8 @@ def test_ws_model_inference():
     # call model inference
     with connect(f"ws://{HOST}:{PORT}/{MODEL_NAME}/ws_inference") as websocket:
         message = msgpack.packb({
-            "query": [{"role": "user", "content": "Space the final"}]
+            "query": [{"role": "user", "content": "Space the final"}],
+            "stream": True,
         })
         websocket.send(message)
         while True:

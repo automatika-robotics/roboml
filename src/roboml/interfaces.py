@@ -28,6 +28,9 @@ class SpeechToTextInput(BaseModel):
     max_new_tokens: Optional[int] = Field(
         title="Maximum number of new tokens to be generated", default=None
     )
+    vad_filter: bool = Field(
+        default=False, title="Enable vad filtering on faster whisper input"
+    )
 
 
 class LLMInput(BaseModel):

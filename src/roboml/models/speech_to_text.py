@@ -44,6 +44,6 @@ class Whisper(ModelTemplate):
 
         # make inference
         segments, _ = self.model.transcribe(
-            audio=audio, max_new_tokens=data.max_new_tokens
+            audio=audio, max_new_tokens=data.max_new_tokens, vad_filter=data.vad_filter
         )
         return {"output": " ".join([s.text.strip() for s in segments])}

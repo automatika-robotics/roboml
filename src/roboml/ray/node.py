@@ -82,10 +82,12 @@ class RayNode:
         # verify model input
         try:
             data = self.data_model(**body)
+            result = self.model._inference(data)
         except ValidationError as e:
             self.logger.error("Validation Error occured for inference input")
             raise HTTPException(status_code=400, detail=e.errors()) from e
-        result = self.model._inference(data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
         # Send streaming response if set in the model
         if isinstance(result, AsyncGenerator):
             return StreamingResponse(result, media_type="text/plain")
@@ -108,7 +110,8 @@ class RayNode:
                         await ws.send_text(res)
                     await ws.send_text("<<Response Ended>>")
                 else:
-                    await ws.send_bytes(msgpack.packb(result))
+                    # send whatever output from the models as bytes
+                    await ws.send_bytes(result["output"])
 
         except ValidationError as e:
             self.logger.error("Validation Error occured for inference input")

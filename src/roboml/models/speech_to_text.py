@@ -35,10 +35,15 @@ class Whisper(ModelTemplate):
         :returns:   Model output
         :rtype:     dict
         """
-        # Treat strings as base64 encoded numpy array
+        # Treat strings as base64 encoded bytes
+        query = (
+            base64.b64decode(data.query) if isinstance(data.query, str) else data.query
+        )
+
+        # Treat bytes as 16-bit encoded audio at 16000Hz sample rate
         audio = (
-            np.frombuffer(base64.b64decode(data.query), dtype=np.float32)
-            if isinstance(data.query, str)
+            np.frombuffer(query, dtype=np.int16).astype(np.float32) / 32768
+            if isinstance(data.query, bytes)
             else data.query
         )
 

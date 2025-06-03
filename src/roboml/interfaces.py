@@ -22,8 +22,9 @@ class SpeechToTextInput(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    query: Union[str, np.ndarray] = Field(
-        title="Audio input as base64 encoded or raw np array", min_length=1
+    query: Union[str, bytes, np.ndarray] = Field(
+        title="Audio input as base64 encoded string or raw bytes or np.ndarray",
+        min_length=1,
     )
     max_new_tokens: Optional[int] = Field(
         title="Maximum number of new tokens to be generated", default=None

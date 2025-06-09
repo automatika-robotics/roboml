@@ -29,8 +29,15 @@ class SpeechToTextInput(BaseModel):
     max_new_tokens: Optional[int] = Field(
         title="Maximum number of new tokens to be generated", default=None
     )
+    initial_prompt: Optional[str] = Field(
+        default=None, title="Initial prompt to the whisper model"
+    )
+    language: Optional[str] = Field(default=None, title="Language for whisper model")
     vad_filter: bool = Field(
         default=False, title="Enable vad filtering on faster whisper input"
+    )
+    word_timestamps: bool = Field(
+        default=False, title="Get word time stamps from whisper model"
     )
 
 

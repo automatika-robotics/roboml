@@ -49,6 +49,23 @@ class Whisper(ModelTemplate):
 
         # make inference
         segments, _ = self.model.transcribe(
-            audio=audio, max_new_tokens=data.max_new_tokens, vad_filter=data.vad_filter
+            audio=audio,
+            max_new_tokens=data.max_new_tokens,
+            initial_prompt=data.initial_prompt,
+            condition_on_previous_text=True,
+            vad_filter=data.vad_filter,
+            word_timestamps=data.word_timestamps,
+            language=data.language,
         )
+
+        if data.word_timestamps:
+            o = []
+            # print(list(segments))
+            for segment in segments:
+                for word in segment.words:
+                    w = word.word
+                    t = (word.start, word.end, w)
+                    o.append(t)
+            return {"output": o}
+
         return {"output": " ".join([s.text.strip() for s in segments])}

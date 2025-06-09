@@ -103,6 +103,12 @@ class RayNode:
                 data_dict = msgpack.unpackb(raw_data)
                 # verify model input
                 data = self.data_model(**data_dict)
+
+                # check for termination signal
+                if getattr(data, "query", None) == b"\r\n":
+                    await ws.send_bytes(msgpack.packb(data.query))
+                    continue
+
                 result = self.model._inference(data)
 
                 if isinstance(result, AsyncGenerator):
@@ -110,8 +116,14 @@ class RayNode:
                         await ws.send_text(res)
                     await ws.send_text("<<Response Ended>>")
                 else:
-                    # send whatever output from the models as bytes
-                    await ws.send_text(result["output"])
+                    res = result["output"]
+                    if isinstance(res, str):
+                        await ws.send_text(res)
+                    elif isinstance(res, bytes):
+                        await ws.send_bytes(res)
+                    # send whatever output from the models as packed bytes
+                    else:
+                        await ws.send_bytes(msgpack.packb(res))
 
         except ValidationError as e:
             self.logger.error("Validation Error occured for inference input")

@@ -22,6 +22,9 @@ from roboml.utils import Status, logging
 # patch msgpack for numpy
 m_pack.patch()
 
+# Define a constant for the chunk size (1MB)
+CHUNK_SIZE = 1 * 1024 * 1024
+
 
 @ingress_decorator
 class RayNode:
@@ -93,6 +96,28 @@ class RayNode:
             return StreamingResponse(result, media_type="text/plain")
         return result
 
+    async def _send_chunked(self, ws: WebSocket, data: str | bytes) -> None:
+        """
+        Sends data over the websocket, chunking it if it's larger than CHUNK_SIZE.
+        - For bytes, data is split into chunks of CHUNK_SIZE bytes.
+        - For strings, data is encoded to check byte size, but sliced by character
+          count to preserve valid text frames to avoid splitting multi-byte characters.
+        """
+        if isinstance(data, str):
+            # Check the encoded byte size of the string
+            if len(data.encode("utf-8")) > CHUNK_SIZE:
+                for i in range(0, len(data), CHUNK_SIZE):
+                    await ws.send_text(data[i : i + CHUNK_SIZE])
+            else:
+                await ws.send_text(data)
+
+        elif isinstance(data, bytes):
+            if len(data) > CHUNK_SIZE:
+                for i in range(0, len(data), CHUNK_SIZE):
+                    await ws.send_bytes(data[i : i + CHUNK_SIZE])
+            else:
+                await ws.send_bytes(data)
+
     @app.websocket("/ws_inference")
     async def handle_request(self, ws: WebSocket) -> None:
         """Websockets endpoint that streams text data for text generation models"""
@@ -117,13 +142,13 @@ class RayNode:
                     await ws.send_text("<<Response Ended>>")
                 else:
                     res = result["output"]
-                    if isinstance(res, str):
-                        await ws.send_text(res)
-                    elif isinstance(res, bytes):
-                        await ws.send_bytes(res)
-                    # send whatever output from the models as packed bytes
+                    if isinstance(res, (str, bytes)):
+                        await self._send_chunked(ws, res)
                     else:
-                        await ws.send_bytes(msgpack.packb(res))
+                        # For other types, pack them first then send with chunking.
+                        # TODO: Currently assumes that msgpack data is
+                        # always smaller than CHUNK_SIZE
+                        await self._send_chunked(ws, msgpack.packb(res))
 
         except ValidationError as e:
             self.logger.error("Validation Error occured for inference input")

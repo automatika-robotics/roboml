@@ -4,6 +4,7 @@ import logging
 import inspect
 import pytest
 import cv2
+import wave
 
 from roboml import models
 from roboml.models.vision import VisionModel
@@ -15,6 +16,22 @@ from roboml.interfaces import (
     SpeechToTextInput,
     TextToSpeechInput,
 )
+
+
+def wav_to_base64(filepath):
+    with wave.open(filepath, "rb") as wf:
+        # Ensure format is 16-bit PCM and 16000Hz
+        if wf.getsampwidth() != 2:
+            raise ValueError("Expected 16-bit audio (2 bytes per sample)")
+        if wf.getframerate() != 16000:
+            raise ValueError("Expected 16000 Hz sample rate")
+
+        # Read raw frames
+        audio_bytes = wf.readframes(wf.getnframes())
+
+        # Encode to base64
+        base64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+        return base64_audio
 
 
 @pytest.fixture
@@ -106,7 +123,8 @@ def test_speech_to_text(models_in_module):
     """
     Test speech to text
     """
-    data = {"query": "tests/resources/test.wav", "max_new_tokens": None}
+    wav_str = wav_to_base64("tests/resources/test.wav")
+    data = {"query": wav_str, "max_new_tokens": None}
     inputs = [SpeechToTextInput(**data)]
     run_models(models_in_module, inputs, log_output=True)
 

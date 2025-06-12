@@ -43,8 +43,8 @@ class Whisper(ModelTemplate):
         # Treat bytes as 16-bit encoded audio at 16000Hz sample rate
         audio = (
             np.frombuffer(query, dtype=np.int16).astype(np.float32) / 32768
-            if isinstance(data.query, bytes)
-            else data.query
+            if isinstance(query, bytes)
+            else query
         )
 
         # make inference

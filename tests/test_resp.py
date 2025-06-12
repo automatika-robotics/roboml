@@ -79,7 +79,6 @@ def test_model_inference():
     body = msgpack.packb(body)
     response = r.execute_command(f"{MODEL_NAME}.inference", body)
     response = msgpack.unpackb(response)
-    logging.info(response)
     assert "output" in response
 
 

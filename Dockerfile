@@ -1,8 +1,8 @@
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
 # setup environment
-ENV LANG C.UTF-8
-ENV LC_ALL C.UTF-8
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
 WORKDIR /roboml
 

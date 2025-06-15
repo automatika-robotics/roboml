@@ -10,6 +10,10 @@ COPY . .
 
 RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && pip install pip-tools && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Update pytorch and transformers in the base container
+RUN python3 -m pip install --no-cache https://developer.download.nvidia.com/compute/redist/jp/v60/pytorch/torch-2.4.0a0+f70bd71a48.nv24.06.15634931-cp310-cp310-linux_aarch64.whl
+RUN pip install -U transformers
+
 RUN pip install .[vision]
 
 # Install vision dependencies
@@ -18,12 +22,6 @@ RUN pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/to
 WORKDIR /
 
 RUN git clone https://github.com/open-mmlab/mmdetection.git && pip install -v -e mmdetection/
-
-# Install bitsandbytes
-RUN git clone https://github.com/bitsandbytes-foundation/bitsandbytes.git && cd bitsandbytes && pip install -r requirements-dev.txt
-RUN cmake -DCOMPUTE_BACKEND=cuda -S .
-RUN make
-RUN pip install .
 
 WORKDIR /roboml
 

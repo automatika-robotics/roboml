@@ -23,7 +23,7 @@ dependencies = [
     "torch<=2.4",  # for mmcv==2.1 and mmdetection
     "accelerate",
     "transformers",
-    "bitsandbytes ; platform_machine == 'x86_64'",
+    "bitsandbytes",
     "pillow",
     "msgpack",
     "msgpack_numpy",

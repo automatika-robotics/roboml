@@ -14,11 +14,10 @@ RUN pip install .[vision]
 
 # Install vision dependencies
 RUN pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-
 WORKDIR /
-
 RUN git clone https://github.com/open-mmlab/mmdetection.git && pip install -v -e mmdetection/
 
 WORKDIR /roboml
 
-ENTRYPOINT ["roboml"]
+# clean up
+RUN rm -rf mmdetection roboml

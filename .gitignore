@@ -102,7 +102,6 @@ log/
 install/
 
 # custom
-docs/
 shared/
 logdir/
 data/

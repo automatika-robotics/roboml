@@ -1,4 +1,7 @@
 # RoboML 🤖
+
+[中文版本](docs/README.zh-CN.md)
+
 [![PyPI][pypi-badge]][pypi-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Python Version][python-badge]][python-url]
@@ -10,118 +13,140 @@
 [python-badge]: https://img.shields.io/pypi/pyversions/roboml.svg
 [python-url]: https://www.python.org/downloads/
 
-RoboML is an aggregator package written for quickly deploying open source ML models for robots. It is designed to cover two basic use cases.
+RoboML is an aggregator package for quickly deploying open-source ML models for robots. It supports three main use cases:
 
-- **Readily deploy various useful models:** The package provides a wrapper around useful ML libraries such as 🤗 [**Transformers**](https://github.com/huggingface/transformers). Pretty much all relevant open source models from these libraries can be quickly deployed behind a highly scalable server endpoint.
-- **Deploy Detection Models with Tracking**: With RoboML one can deploy all detection models available in [**MMDetection**](https://github.com/open-mmlab/mmdetection). An open source vision model aggregation library. These detection models can also be seemlesly used for tracking.
-- **Aggregate robot specific ML models from the Robotics community**: RoboML aims to be an aggregator package of models trained by the robotics community. These models can range from Multimodal LLMs, vision models, or robot action models, and can be used with ROS based functional components. See the usage in [ROS Agents](https://automatika-robotics.github.io/ros-agents)
+- **Rapid deployment of general-purpose models:** Wraps around popular ML libraries like 🤗 [**Transformers**](https://github.com/huggingface/transformers), allowing fast deployment of models through scalable server endpoints.
+- **Deploy detection models with tracking:** Supports deployment of all detection models in [**MMDetection**](https://github.com/open-mmlab/mmdetection) with optional tracking integration.
+- **Aggregate robot-specific models from the robotics community:** Intended as a platform for community-contributed multimodal models, usable in planning and control, especially with ROS components. See [ROS Agents](https://automatika-robotics.github.io/ros-agents).
 
 ## Installation
 
-RoboML has been tested on Ubuntu 20.04 and later. It should ideally be installed on a system with a GPU and CUDA 12.1. However, it should work without a GPU. If you encounter any installation problems, please open an issue.
+RoboML has been tested on Ubuntu 20.04 and later. A GPU with CUDA 12.1+ is recommended. If you encounter issues, please [open an issue](https://github.com/automatika-robotics/roboml/issues).
 
-`pip install roboml`
+```bash
+pip install roboml
+```
 
 ### From Source
 
-```shell
+```bash
 git clone https://github.com/automatika-robotics/roboml.git && cd roboml
 virtualenv venv && source venv/bin/activate
 pip install pip-tools
 pip install .
 ```
 
-## For vision models support
+## Vision Model Support
 
-If you want to utilize detection and tracking using Vision models from the MMDetection library, you will need to install a couple of dependancies as follows:
+To use detection and tracking features via MMDetection:
 
-- Install RoboML using the vision flag:
+- Install RoboML with the vision extras:
 
-  `pip install roboml[vision]`
+  ```bash
+  pip install roboml[vision]
+  ```
 
-- Install mmcv using the installation instructions provided [here](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). For installation with pip, simply pick PyTorch and CUDA version that you have installed and copy the pip installation command generated. For example for PyTorch 2.1:
+- Install `mmcv` using the appropriate CUDA and PyTorch versions as described in [their docs](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). Example for PyTorch 2.1 with CUDA 12.1:
 
-   `pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html`
+  ```bash
+  pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
+  ```
 
-- Install mmdetection as follows:
+- Install `mmdetection`:
 
-```shell
-git clone https://github.com/open-mmlab/mmdetection.git
-cd mmdetection
-pip install -v -e .
-```
+  ```bash
+  git clone https://github.com/open-mmlab/mmdetection.git
+  cd mmdetection
+  pip install -v -e .
+  ```
 
-- If ffmpeg and libGL are missing then run the following:
+- If `ffmpeg` or `libGL` is missing:
 
-`sudo apt-get update && apt-get install ffmpeg libsm6 libxext6`
+  ```bash
+  sudo apt-get update && apt-get install ffmpeg libsm6 libxext6
+  ```
 
-### TensorRT Based Model Deployment
-Vision models in RoboML can be deployed for faster inference with NVIDIA TensorRT, whenever NVIDIA GPU support is available. This deployment is currently supported for Linux based x86_64 systems. TensorRT needs to be installed in order for this feature to work. Please check out detailed install instructions [here](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
+### TensorRT-Based Model Deployment
 
-## Model quantization support
+RoboML vision models can optionally be accelerated with NVIDIA TensorRT on Linux x86_64 systems. For setup, follow the [TensorRT installation guide](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
 
-RoboML uses [bitsandbytes](https://huggingface.co/docs/bitsandbytes/main/en/index) for model quantization. However it is only installed as a dependency automatically on **x86_64** architectures as bitsandbytes pre-built wheels are not available for other architectures. For other architures, such as _aarch64_ on NVIDIA Jetson boards, it is recommended to build bitsandbytes from source using the following instructions:
+## Docker Build (Recommended)
 
-```shell
-git clone https://github.com/bitsandbytes-foundation/bitsandbytes.git && cd bitsandbytes/
-pip install -r requirements-dev.txt
-cmake -DCOMPUTE_BACKEND=cuda -S .
-make
-pip install .
-```
-More details are available on the bitsandbytes [installation page](https://huggingface.co/docs/bitsandbytes/main/en/installation).
+Jetson users are especially encouraged to use Docker.
 
-## Build in a Docker container (Recommended)
+- Install Docker Desktop
+- Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-- Install docker desktop.
-- Install [NVIDIA toolkit for Docker](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-
-```shell
+```bash
 git clone https://github.com/automatika-robotics/roboml.git && cd roboml
-# build the container image
+
+# Build container image
 docker build --tag=automatika:roboml .
-# for NVIDIA Jetson boards replace the above command with
+# For Jetson boards:
 docker build --tag=automatika:roboml -f Dockerfile.Jetson .
-# run the container with gpu support
-docker run --runtime=nvidia --gpus all --rm -p 8000:8000 automatika:roboml
+
+# Run HTTP server
+docker run --runtime=nvidia --gpus all --rm -p 8000:8000 automatika:roboml roboml
+# Or run RESP server
+docker run --runtime=nvidia --gpus all --rm -p 6379:6379 automatika:roboml roboml-resp
 ```
+
+- (Optional) Mount your cache dir to persist downloaded models:
+
+  ```bash
+  -v ~/.cache:/root/.cache
+  ```
 
 ## Servers
 
-By default RoboML starts models as [ray serve](https://docs.ray.io/en/latest/serve/index.html) apps. Making the models scalable accross multiple infrastructure configurations. See [ray serve](https://docs.ray.io/en/latest/serve/index.html) for details.
+RoboML uses [Ray Serve](https://docs.ray.io/en/latest/serve/index.html) to host models as scalable apps across various environments.
 
-### An Experimental Server based on RESP
+### WebSocket Endpoint
 
-When using ML models on robots, latency is a major consideration. When models are deployed on distributed infrastructure (and not on the edge, due to compute limitations), latency depends on both the model inference time and server communication time. Therefore, RoboML also implements an experimental server built using [RESP](https://github.com/antirez/RESP3) which can be accessed using any redis client. RESP is a human readable binary safe protocol, which is very simple to parse and thus can be used to implement servers significatly faster than HTTP, specially when the payloads are also packaged binary data (for example images, audio or video data). The RESP server uses msgpack a cross-platform library available in over 50 languages, to package data instead of JSON. Work on the server was inspired by earlier work of [@hansonkd](https://github.com/hansonkd) and his [Tino](https://github.com/hansonkd/Tino) project.
+WebSocket endpoints are exposed for streaming use cases (e.g., STT/TTS).
+
+### Experimental RESP Server
+
+For ultra-low latency in robotics, RoboML also includes a RESP-based server compatible with any Redis client.
+RESP (see [spec](https://github.com/antirez/RESP3)) is a lightweight, binary-safe protocol. Combined with `msgpack` instead of JSON, it enables very fast I/O, ideal for binary data like images, audio, or video.
+
+This work is inspired by [@hansonkd](https://github.com/hansonkd)’s [Tino project](https://github.com/hansonkd/Tino).
 
 ## Usage
 
-To run an HTTP server simply run the following in the terminal
+Run the HTTP server:
 
-`roboml`
+```bash
+roboml
+```
 
-To run an RESP based server, run
+Run the RESP server:
 
-`roboml-resp`
+```bash
+roboml-resp
+```
 
-In order to see how these servers are called from a ROS package that implements its clients, please refer to [ROS Agents](https://automatika-robotics.github.io/ros-agents) documentation.
+Example usage in ROS clients is documented in [ROS Agents](https://automatika-robotics.github.io/ros-agents).
 
 ## Running Tests
 
-To run tests, install with:
+Install dev dependencies:
 
-`pip install ".[dev]"`
+```bash
+pip install ".[dev]"
+```
 
-And run the following in the root directory
+Run tests from the project root:
 
-`python -m pytest`
+```bash
+python -m pytest
+```
 
 ## Copyright
 
-The code in this distribution is Copyright (c) 2024 Automatika Robotics unless explicitly indicated otherwise.
-
-RoboML is made available under the MIT license. Details can be found in the [LICENSE](LICENSE) file.
+Unless otherwise specified, all code is © 2024 Automatika Robotics.
+RoboML is released under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Contributions
 
-ROS Agents has been developed in collaboration betweeen [Automatika Robotics](https://automatikarobotics.com/) and [Inria](https://inria.fr/). Contributions from the community are most welcome.
+ROS Agents is developed in collaboration between [Automatika Robotics](https://automatikarobotics.com/) and [Inria](https://inria.fr/). Community contributions are welcome!

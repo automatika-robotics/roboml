@@ -1,7 +1,6 @@
 import base64
 import inspect
 import logging
-import logging.config
 from enum import Enum
 from functools import wraps
 from io import BytesIO

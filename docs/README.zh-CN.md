@@ -1,6 +1,6 @@
 # RoboML 🤖 中文版
 
-[English Version](README.md)
+[English Version](../README.md)
 
 [![PyPI][pypi-badge]][pypi-url]
 [![MIT licensed][mit-badge]][mit-url]

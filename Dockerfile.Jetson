@@ -1,8 +1,8 @@
 FROM dustynv/transformers:r36.2.0
 
 # setup environment
-ENV LANG C.UTF-8
-ENV LC_ALL C.UTF-8
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 
 WORKDIR /roboml
 
@@ -10,21 +10,23 @@ COPY . .
 
 RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && pip install pip-tools && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Update pytorch, transformers and torchvision in the base container for torch 2.4
+RUN pip install -U transformers
+RUN python3 -m pip install --no-cache https://pypi.jetson-ai-lab.dev/jp6/cu122/+f/caa/8de487371c7f6/torch-2.4.0-cp310-cp310-linux_aarch64.whl#sha256=caa8de487371c7f66b566025700635c30728032e0a3acf1c3183cec7c2787f94
+RUN python3 -m pip install --no-cache https://pypi.jetson-ai-lab.dev/jp6/cu122/+f/8c0/114b6c62bfa3d/torchvision-0.19.0a0+48b1edf-cp310-cp310-linux_aarch64.whl#sha256=8c0114b6c62bfa3d60d08b51f1467e0ea1ee4916e5b4b1084db50c2c1f345d93
+
+# Install bitsandbytes
+RUN python3 -m pip install --no-cache https://pypi.jetson-ai-lab.dev/jp6/cu122/+f/ebd/441cbfcc6f03f/bitsandbytes-0.44.1-cp310-cp310-linux_aarch64.whl#sha256=ebd441cbfcc6f03f13f7a17117391aae47521d694fc738cc7616529454b0e224
+
+# Test pytorch
+RUN python3 -c 'import torch'
+
 RUN pip install .[vision]
 
 # Install vision dependencies
 RUN pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-
 WORKDIR /
+RUN git clone https://github.com/open-mmlab/mmdetection.git && pip install -v mmdetection/
 
-RUN git clone https://github.com/open-mmlab/mmdetection.git && pip install -v -e mmdetection/
-
-# Install bitsandbytes
-RUN git clone https://github.com/bitsandbytes-foundation/bitsandbytes.git && cd bitsandbytes && pip install -r requirements-dev.txt
-RUN cmake -DCOMPUTE_BACKEND=cuda -S .
-RUN make
-RUN pip install .
-
-WORKDIR /roboml
-
-ENTRYPOINT ["roboml"]
+# clean up
+RUN rm -rf mmdetection roboml

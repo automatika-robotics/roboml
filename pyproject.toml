@@ -20,27 +20,27 @@ classifiers = [
 keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learning"]
 
 dependencies = [
+    "torch<=2.4",  # for mmcv==2.1 and mmdetection
     "accelerate",
     "transformers",
-    "bitsandbytes ; platform_machine == 'x86_64'",
+    "bitsandbytes",
     "pillow",
     "msgpack",
     "msgpack_numpy",
     "hiredis",
     "ray[serve]",
-    "sentencepiece",
     "datasets",
     "scipy",
-    "sentence-transformers",
-    "chromadb",
     "ninja",
     "packaging",
+    "ctranslate2<=4.4",  # for torch<=2.4
+    "faster-whisper"
 ]
 
 requires-python = ">=3.10"
 
 [project.optional-dependencies]
-dev = ["httpx", "pip-tools", "pytest", "pre-commit", "black", "redis"]
+dev = ["httpx", "pip-tools", "pytest", "pre-commit", "redis", "lark"]
 vision = ["mmengine", "platformdirs", "norfair", "mmdeploy==1.3.1 ; platform_machine == 'x86_64'", "mmdeploy-runtime-gpu==1.3.1 ; platform_machine == 'x86_64'", "pycuda", "opencv-python-headless"]
 
 [project.scripts]

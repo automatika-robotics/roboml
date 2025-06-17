@@ -1,7 +1,6 @@
 import base64
 import inspect
 import logging
-import logging.config
 from enum import Enum
 from functools import wraps
 from io import BytesIO
@@ -12,7 +11,7 @@ import numpy as np
 import torch
 import yaml
 from PIL import Image as PILImage
-from pkg_resources import get_distribution
+from importlib.metadata import distribution, PackageNotFoundError
 from scipy.io.wavfile import write
 
 from roboml.tools.download import DownloadManager
@@ -74,7 +73,7 @@ def b64_str_to_bytes(data: str) -> bytes:
 
 
 def post_process_audio(
-    data: torch.Tensor, sample_rate: int = 16000, get_bytes: bool = False
+    data: torch.Tensor | np.ndarray, sample_rate: int = 16000, get_bytes: bool = False
 ) -> Union[str, bytes]:
     """
     Returns a bye file location given a torch tensor of audio
@@ -84,12 +83,13 @@ def post_process_audio(
     :rtype:     str
     """
     # create numpy array
-    np_data = data.cpu().detach().numpy().squeeze().astype(np.float32)
+    if not isinstance(data, np.ndarray):
+        data = data.detach().numpy().squeeze().astype(np.float32)
 
     # open buffer and write to it with hard coded sampling rate
     bytes_wav = bytes()
     byte_io = BytesIO(bytes_wav)
-    write(byte_io, sample_rate, np_data)
+    write(byte_io, sample_rate, data)
     audio_bytes = byte_io.read()
 
     if get_bytes:
@@ -280,21 +280,21 @@ def _get_mmdet_package_info() -> Path:
     :rtype: Path
     """
     # get location of mmdet package
-    package = get_distribution("mmdet")
-    if not package.location:
+    try:
+        package = distribution("mmdet")
+        location = Path(str(package.locate_file("")))
+    except PackageNotFoundError:
         logger.error(
             "MMDetection does not seem to be installed. Please install it to run object detection models."
         )
-        raise Exception
-    package_path = Path(package.location) / Path("mmdet")
-    if not package_path.exists():
-        logger.error(
-            "MMDetection does not seem to be installed. Please install it to run object detection models."
-        )
-        raise Exception
-
+        raise
     # return mim path for the mmdet package
-    mim_path = package_path / Path(".mim")
+    mim_path = location / Path("mmdet") / Path(".mim")
+    if not mim_path.exists():
+        logger.error(
+            "MMDetection does not seem to be installed. Please install it to run object detection models."
+        )
+        raise PackageNotFoundError
     return mim_path
 
 

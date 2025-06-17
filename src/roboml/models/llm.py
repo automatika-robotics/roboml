@@ -1,19 +1,17 @@
-from typing import Optional
+from typing import Optional, AsyncGenerator
+from queue import Empty
+import asyncio
 
 import torch
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-)
+from PIL.Image import Image
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 
 from roboml.interfaces import LLMInput
-from roboml.ray import app, ingress_decorator
 from roboml.utils import get_quantization_config
 
 from ._base import ModelTemplate
 
 
-@ingress_decorator
 class TransformersLLM(ModelTemplate):
     """
     Transformers LLM.
@@ -23,11 +21,11 @@ class TransformersLLM(ModelTemplate):
         """__init__.
         :param kwargs:
         """
+
         super().__init__(**kwargs)
         # init chat prompt
-        self.init_chat_prompt = None
+        self.init_chat_prompt: Optional[str] = None
 
-    @app.post("/initialize")
     def _initialize(
         self,
         checkpoint: str = "microsoft/Phi-3-mini-4k-instruct",
@@ -56,8 +54,7 @@ class TransformersLLM(ModelTemplate):
             self.model.to(self.device)
         self.pre_processor = AutoTokenizer.from_pretrained(checkpoint)
 
-    @app.post("/inference")
-    def _inference(self, data: LLMInput) -> dict:
+    def _inference(self, data: LLMInput) -> dict | AsyncGenerator:
         """Model inference.
         :param data:
         :param type: LLMInput
@@ -69,25 +66,73 @@ class TransformersLLM(ModelTemplate):
             data.query, tokenize=False, add_generation_prompt=True
         )
 
-        inputs = self.pre_processor([text], return_tensors="pt").to(self.device)
+        if data.stream:
+            streamer = TextIteratorStreamer(
+                self.pre_processor,
+                timeout=0,
+                skip_prompt=True,
+                skip_special_tokens=True,
+            )
+            self.loop.run_in_executor(
+                None,
+                self.generate_text,
+                text,
+                data.max_new_tokens,
+                data.temperature,
+                streamer,
+            )
+            return self.consume_streamer(streamer)
 
+        input_ids, generated_ids = self.generate_text(
+            text, data.max_new_tokens, data.temperature, None
+        )
+
+        return self.decode_output(input_ids, generated_ids)
+
+    def generate_text(
+        self,
+        text: str,
+        max_new_tokens: int,
+        temperature: float,
+        streamer: Optional[TextIteratorStreamer],
+        images: Optional[list[Image]] = None,
+    ):
+        input = (
+            self.pre_processor(text=text, return_tensors="pt")
+            if not images
+            else self.pre_processor(text=text, images=images, return_tensors="pt")
+        ).to(self.device)
+        # input_ids = input.input_ids.to(self.device)
         with torch.no_grad():
             generated_ids = self.model.generate(
-                **inputs,
+                **input,
+                streamer=streamer,
+                max_new_tokens=max_new_tokens,
                 do_sample=True,
-                temperature=data.temperature,
-                max_new_tokens=data.max_new_tokens,
+                temperature=temperature,
             )
+        if not streamer:
+            return input.input_ids, generated_ids
 
+    def decode_output(self, input_ids, generated_ids):
+        # Remove prompt tokens
         generated_ids = [
             output_ids[len(input_ids) :]
-            for input_ids, output_ids in zip(
-                inputs.input_ids, generated_ids, strict=True
-            )
+            for input_ids, output_ids in zip(input_ids, generated_ids, strict=True)
         ]
 
+        # Decode to get text
         generated_text = self.pre_processor.batch_decode(
             generated_ids, skip_special_tokens=True
         )[0].strip()
 
         return {"output": generated_text}
+
+    async def consume_streamer(self, streamer: TextIteratorStreamer):
+        while True:
+            try:
+                for token in streamer:
+                    yield token
+                break
+            except Empty:
+                await asyncio.sleep(0.001)

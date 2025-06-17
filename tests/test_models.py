@@ -2,17 +2,36 @@ import time
 import base64
 import logging
 import inspect
-
 import pytest
 import cv2
+import wave
+
 from roboml import models
+from roboml.models.vision import VisionModel
 from roboml.models._base import ModelTemplate
 from roboml.interfaces import (
+    LLMInput,
     VLLMInput,
     DetectionInput,
     SpeechToTextInput,
     TextToSpeechInput,
 )
+
+
+def wav_to_base64(filepath):
+    with wave.open(filepath, "rb") as wf:
+        # Ensure format is 16-bit PCM and 16000Hz
+        if wf.getsampwidth() != 2:
+            raise ValueError("Expected 16-bit audio (2 bytes per sample)")
+        if wf.getframerate() != 16000:
+            raise ValueError("Expected 16000 Hz sample rate")
+
+        # Read raw frames
+        audio_bytes = wf.readframes(wf.getnframes())
+
+        # Encode to base64
+        base64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+        return base64_audio
 
 
 @pytest.fixture
@@ -32,6 +51,8 @@ def models_in_module(request):
     if not module:
         return None
     module = module.args[0]
+    if module == "vision":
+        return [VisionModel]
     module = getattr(models, module)
     return [
         model_class
@@ -45,7 +66,7 @@ def run_models(models_in_module, inputs, log_output=False):
     Init models and run inference
     """
     for Model in models_in_module:
-        model = Model(name="test")
+        model = Model(logger=logging.getLogger("test"))
         logging.info(f"Testing {Model.__name__}")
         model._initialize()
         for input in inputs:
@@ -56,20 +77,32 @@ def run_models(models_in_module, inputs, log_output=False):
             logging.info("--- %s seconds ---" % (time.time() - start_time))
 
 
+@pytest.mark.module("llm")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_llms(models_in_module):
+    """
+    Test vllms
+    """
+    data = {
+        "query": [{"role": "user", "content": "Whats up?"}],
+    }
+    input = LLMInput(**data)
+    inputs = [input]
+    run_models(models_in_module, inputs, log_output=True)
+
+
 @pytest.mark.module("mllm")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_vllms(loaded_img, models_in_module):
     """
     Test vllms
     """
-    inputs = []
     data = {
-        "query": "What do you see?",
+        "query": [{"role": "user", "content": "What do you see?"}],
         "images": [loaded_img],
-        "chat_history": True,
     }
-    inputs.append(VLLMInput(**data))
-    inputs.append(VLLMInput(query="How is it made?", images=[loaded_img]))
+    input = VLLMInput(**data)
+    inputs = [input]
     run_models(models_in_module, inputs, log_output=True)
 
 
@@ -90,11 +123,10 @@ def test_speech_to_text(models_in_module):
     """
     Test speech to text
     """
-    with open("tests/resources/test.wav", "rb") as file:
-        file_bytes = file.read()
-    data = {"query": file_bytes, "max_new_tokens": 100}
+    wav_str = wav_to_base64("tests/resources/test.wav")
+    data = {"query": wav_str, "max_new_tokens": None}
     inputs = [SpeechToTextInput(**data)]
-    run_models(models_in_module, inputs)
+    run_models(models_in_module, inputs, log_output=True)
 
 
 @pytest.mark.module("vision")

@@ -1,8 +1,9 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="_static/RoboML_DARK.png">
   <source media="(prefers-color-scheme: light)" srcset="_static/RoboML_LIGHT.png">
-  <img alt="RoboML Logo" src="_static/RoboML_LIGHT.png"  width="40%" style="margin-bottom: 1%;">
+  <img alt="RoboML Logo" src="_static/RoboML_LIGHT.png"  width="40%">
 </picture>
+<br/><br/>
 
 [![English Version][en-badge]][en-url]
 [![PyPI][pypi-badge]][pypi-url]
@@ -17,6 +18,7 @@
 [mit-url]: https://github.com/automatika-robotics/roboml/LICENSE
 [python-badge]: https://img.shields.io/pypi/pyversions/roboml.svg
 [python-url]: https://www.python.org/downloads/
+<br/>
 
 RoboML 是一个聚合包，用于快速部署面向机器人的开源机器学习模型。它设计用于满足两个基本用例：
 

@@ -1,8 +1,9 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/_static/RoboML_DARK.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/_static/RoboML_LIGHT.png">
-  <img alt="RoboML Logo" src="docs/_static/RoboML_LIGHT.png"  width="40%" style="margin-bottom: 1%;">
+  <img alt="RoboML Logo" src="docs/_static/RoboML_LIGHT.png"  width="40%">
 </picture>
+<br/><br/>
 
 [![中文版本][cn-badge]][cn-url]
 [![PyPI][pypi-badge]][pypi-url]
@@ -17,6 +18,7 @@
 [mit-url]: https://github.com/automatika-robotics/roboml/LICENSE
 [python-badge]: https://img.shields.io/pypi/pyversions/roboml.svg
 [python-url]: https://www.python.org/downloads/
+<br/>
 
 RoboML is an aggregator package for quickly deploying open-source ML models for robots. It supports three main use cases:
 

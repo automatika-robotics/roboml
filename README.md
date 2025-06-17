@@ -1,11 +1,16 @@
-# RoboML 🤖
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/_static/RoboML_DARK.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/_static/RoboML_LIGHT.png">
+  <img alt="RoboML Logo" src="docs/_static/RoboML_LIGHT.png"  width="40%" style="margin-bottom: 1%;">
+</picture>
 
-[中文版本](docs/README.zh-CN.md)
-
+[![中文版本][cn-badge]][cn-url]
 [![PyPI][pypi-badge]][pypi-url]
 [![MIT licensed][mit-badge]][mit-url]
 [![Python Version][python-badge]][python-url]
 
+[cn-badge]: https://img.shields.io/badge/文档-中文-blue.svg
+[cn-url]: docs/README.zh-CN.md
 [pypi-badge]: https://img.shields.io/pypi/v/roboml.svg
 [pypi-url]: https://pypi.org/project/roboml/
 [mit-badge]: https://img.shields.io/pypi/l/roboml.svg

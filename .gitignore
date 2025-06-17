@@ -111,7 +111,6 @@ tmp/
 *.h5
 *.npz
 *.zip
-*.png
 *.ods
 *.xyz
 *.off

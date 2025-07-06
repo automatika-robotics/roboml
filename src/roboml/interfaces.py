@@ -1,7 +1,7 @@
-from typing import Optional, Union
+from typing import Optional, Union, Literal
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # IO Interfaces
@@ -66,6 +66,23 @@ class VLLMInput(LLMInput):
     images: Union[list[str], list[np.ndarray]] = Field(
         title="List of images as base64 strings or numpy arrays", min_length=1
     )
+
+
+class PlanningInput(VLLMInput):
+    """Input values for multimodal LLMs specifically trained for planning tasks"""
+
+    task: Literal["general", "pointing", "affordance", "trajectory", "grounding"] = (
+        Field(default="general", title="One of the tasks the model is trained on")
+    )
+    enable_thinking: bool = Field(default=True)
+
+    @model_validator(mode="after")
+    def validate_task_and_images(self) -> "PlanningInput":
+        if self.task != "general" and len(self.images) != 1:
+            raise ValueError(
+                "Pointing, affordance, grounding, and trajectory tasks require exactly one image."
+            )
+        return self
 
 
 class DetectionInput(BaseModel):

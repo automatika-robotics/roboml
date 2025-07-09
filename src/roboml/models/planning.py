@@ -112,7 +112,7 @@ class RoboBrain2(ModelTemplate):
 
         answer = self._extract_output(answer_text, data.task)
 
-        return {"output": {"answer": answer, "thinking": thinking_text}}
+        return {"output": answer, "thinking": thinking_text}
 
     def __create_prompt(self, query: list[dict], task: str, num_images: int) -> list:
         """

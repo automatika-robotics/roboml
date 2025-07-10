@@ -23,7 +23,7 @@ RoboML is an aggregator package for quickly deploying open-source ML models for 
 
 - **Rapid deployment of general-purpose models:** Wraps around popular ML libraries like 🤗 [**Transformers**](https://github.com/huggingface/transformers), allowing fast deployment of models through scalable server endpoints.
 - **Deploy detection models with tracking:** Supports deployment of all detection models in [**MMDetection**](https://github.com/open-mmlab/mmdetection) with optional tracking integration.
-- **Aggregate robot-specific models from the robotics community:** Intended as a platform for community-contributed multimodal models, usable in planning and control, especially with ROS components. See [ROS Agents](https://automatika-robotics.github.io/ros-agents).
+- **Aggregate robot-specific models from the robotics community:** Intended as a platform for community-contributed multimodal models, usable in planning and control, especially with ROS components. See [EmbodiedAgents](https://automatika-robotics.github.io/embodied-agents).
 
 ## Installation
 

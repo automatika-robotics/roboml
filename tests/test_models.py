@@ -11,6 +11,7 @@ from roboml.models.vision import VisionModel
 from roboml.models._base import ModelTemplate
 from roboml.interfaces import (
     LLMInput,
+    PlanningInput,
     VLLMInput,
     DetectionInput,
     SpeechToTextInput,
@@ -137,4 +138,24 @@ def test_vison(loaded_img, models_in_module):
     """
     data = {"images": [loaded_img], "threshold": 0.5}
     inputs = [DetectionInput(**data)]
+    run_models(models_in_module, inputs, log_output=True)
+
+
+@pytest.mark.module("planning")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_planning(loaded_img, models_in_module):
+    """
+    Test planning
+    """
+    data_1 = {
+        "query": [{"role": "user", "content": "What is in this image?"}],
+        "task": "general",
+        "images": [loaded_img],
+    }
+    data_2 = {
+        "query": [{"role": "user", "content": "The sandwich"}],
+        "task": "grounding",
+        "images": [loaded_img],
+    }
+    inputs = [PlanningInput(**data_1), PlanningInput(**data_2)]
     run_models(models_in_module, inputs, log_output=True)

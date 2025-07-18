@@ -21,7 +21,7 @@ class AppFactory:
         """__init__."""
         # register all apps created by the factory
         self.app_dict: dict = {}
-        self.nodes_per_cpu: int = nodes_per_cpu if nodes_per_cpu else 2
+        self.nodes_per_cpu: int = nodes_per_cpu if nodes_per_cpu else 1
         self.nodes_per_gpu: int = nodes_per_gpu if nodes_per_gpu else 5
 
     @app.get("/")

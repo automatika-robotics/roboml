@@ -23,6 +23,7 @@ dependencies = [
     "torch<=2.4",  # for mmcv==2.1 and mmdetection
     "accelerate",
     "transformers<=4.49.0",  # for torch<=2.4
+    "sentencepiece",
     "bitsandbytes",
     "pillow",
     "msgpack",

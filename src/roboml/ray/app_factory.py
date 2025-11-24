@@ -70,6 +70,19 @@ class AppFactory:
                     detail="In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection following instructions given on this link, https://github.com/automatika-robotics/robml",
                 ) from e
             module = VisionModel
+        # add exception for LeRobotPolicy
+        elif node_model == "LeRobotPolicy":
+            try:
+                from roboml.models.vla import LeRobotPolicy
+            except ModuleNotFoundError as e:
+                logger.error(
+                    "In order to use VLA policies from LeRobot, install roboml with `pip install roboml[lerobot]`"
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail="In order to use VLA policies from LeRobot, install roboml with `pip install roboml[lerobot]`",
+                ) from e
+            module = LeRobotPolicy
         else:
             logger.error(f"Requested node class {node_model} does not exist")
             raise HTTPException(

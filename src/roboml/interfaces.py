@@ -101,3 +101,24 @@ class DetectionInput(BaseModel):
         title="List of labels to track. Only used if tracking is enabled during initialization",
         default=None,
     )
+
+
+class VLAInput(BaseModel):
+    """Input for VLA policies."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    images: dict[str, Union[str, np.ndarray]] = Field(
+        title="Dict of images where keys must be the same as ones present in the training dataset and values are list of images as base64 strings or numpy arrays",
+        min_length=1,
+    )
+    state: Union[list[float], np.ndarray] = Field(
+        title="List representing robot state, should be similar to the one used during training",
+        min_length=1,
+    )
+    robot_type: Optional[str] = Field(
+        title="Optional robot type string if used by the model", default=None
+    )
+    task: Optional[str] = Field(
+        title="Optional task description for general VLAs", default=None
+    )

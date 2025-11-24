@@ -125,6 +125,17 @@ class Server:
                     "In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection as explained here, https://github.com/automatika-robotics/robml"
                 ) from e
             module = VisionModel
+        elif node_model == "LeRobotPolicy":
+            try:
+                from roboml.models.vla import LeRobotPolicy
+            except ModuleNotFoundError as e:
+                self.logger.error(
+                    "In order to use VLA policies from LeRobot, install roboml with `pip install roboml[lerobot]`"
+                )
+                raise ModuleNotFoundError(
+                    "In order to use VLA policies from LeRobot, install roboml with `pip install roboml[lerobot]`",
+                ) from e
+            module = LeRobotPolicy
         else:
             self.logger.error(f"Requested node class {node_model} does not exist")
             raise ModuleNotFoundError(

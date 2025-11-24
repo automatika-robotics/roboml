@@ -19,47 +19,44 @@ from roboml.tools.download import DownloadManager
 logger = logging.getLogger("roboml")
 
 
+def pre_process_single_image_to_pil(data: Union[str, np.ndarray]) -> PILImage.Image:
+    """
+    Convert a single numpy array or base64 string to a PIL Image.
+    """
+    if isinstance(data, np.ndarray):
+        return PILImage.fromarray(data)
+
+    return PILImage.open(BytesIO(base64.b64decode(data)))
+
+
 def pre_process_images_to_pil(
     data: Union[list[str], list[np.ndarray]],
-    concatenate: bool = False,
-) -> Union[PILImage.Image, list[PILImage.Image]]:
+) -> list[PILImage.Image]:
     """
-    Returns PIL Image given an np array or base64 str
-    :param data: list of images as np.ndarray or base64 str
-    :type data: list[np.ndarray] | list[str]
-    :param concatenate: bool
-    :rtype: PILImage.Image | list[PILImage.Image]
+    Convert multiple numpy arrays or base64 strings into a list of PIL images.
+    Uses pre_process_single_image_to_pil for each item.
     """
-    # TODO: Handle multiple images by concatenation
-    if concatenate:
-        if isinstance(data[0], np.ndarray):
-            return PILImage.fromarray(data[0])
-        return PILImage.open(BytesIO(base64.b64decode(data[0])))
-    if isinstance(data[0], np.ndarray):
-        return [PILImage.fromarray(img) for img in data]
-    return [PILImage.open(BytesIO(base64.b64decode(img))) for img in data]
+    return [pre_process_single_image_to_pil(img) for img in data]
+
+
+def pre_process_single_image_to_np(data: Union[str, np.ndarray]) -> np.ndarray:
+    """
+    Convert a single numpy array or base64 string to a numpy array.
+    """
+    if isinstance(data, np.ndarray):
+        return data
+
+    return np.array(PILImage.open(BytesIO(base64.b64decode(data))))
 
 
 def pre_process_images_to_np(
     data: Union[list[str], list[np.ndarray]],
-    concatenate: bool = False,
-) -> Union[np.ndarray, list[np.ndarray]]:
+) -> list[np.ndarray]:
     """
-    Returns numpy array given an np array or base64 str
-    :param data: list of images as np.ndarray or base64 str
-    :type data: list[np.ndarray] | list[str]
-    :param concatenate: bool
-    :rtype: np.ndarray | list[np.ndarray]
+    Convert multiple numpy arrays or base64 strings into a list of numpy arrays.
+    Uses pre_process_single_image_to_np for each item.
     """
-    # TODO: Handle multiple images by concatenation
-    if concatenate:
-        if isinstance(data[0], np.ndarray):
-            return data[0]
-        return np.array(PILImage.open(BytesIO(base64.b64decode(data[0]))))
-    if isinstance(data[0], np.ndarray):
-        # assume the whole list is ndarray
-        return data  # type: ignore
-    return [np.array(PILImage.open(BytesIO(base64.b64decode(img)))) for img in data]
+    return [pre_process_single_image_to_np(img) for img in data]
 
 
 def b64_str_to_bytes(data: str) -> bytes:

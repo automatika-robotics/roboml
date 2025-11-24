@@ -1,4 +1,5 @@
 import re
+import os
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
 from roboml.interfaces import PlanningInput
@@ -38,6 +39,13 @@ class RoboBrain2(ModelTemplate):
         :type history_reset_phrase: str
         :rtype: None
         """
+        if not os.environ["HF_TOKEN"]:
+            raise ValueError(
+                """This model is gated on HF hub, and requires an authentication token  which can be obtained after agreeing to its terms of use. Set your auth token as follows:
+
+                export HF_TOKEN = 'Your auth token from HuggingFace'
+                For more information see https://huggingface.co/BAAI/RoboBrain2.0-7B"""
+            )
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             checkpoint, torch_dtype="auto"
         ).to(self.device)

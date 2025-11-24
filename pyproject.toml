@@ -20,9 +20,9 @@ classifiers = [
 keywords = ["robots", "robotics", "machine learning", "multimodal", "deep learning"]
 
 dependencies = [
-    "torch<=2.4",  # for mmcv==2.1 and mmdetection
+    "torch",
     "accelerate",
-    "transformers<=4.49.0",  # for torch<=2.4
+    "transformers",
     "sentencepiece",
     "bitsandbytes",
     "pillow",
@@ -34,7 +34,7 @@ dependencies = [
     "scipy",
     "ninja",
     "packaging",
-    "ctranslate2<=4.4",  # for torch<=2.4
+    "ctranslate2",
     "faster-whisper"
 ]
 
@@ -42,7 +42,12 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = ["httpx", "pip-tools", "pytest", "pre-commit", "redis", "lark"]
-vision = ["mmengine", "platformdirs", "norfair", "mmdeploy==1.3.1 ; platform_machine == 'x86_64'", "mmdeploy-runtime-gpu==1.3.1 ; platform_machine == 'x86_64'", "pycuda"]
+
+# downgrade pytorch to use vision models
+vision = ["torch<=2.4" ,"mmengine", "platformdirs", "norfair", "mmdeploy==1.3.1 ; platform_machine == 'x86_64'", "mmdeploy-runtime-gpu==1.3.1 ; platform_machine == 'x86_64'", "pycuda"]
+
+# install lerobot from source
+lerobot = ["lerobot==0.4.1"]
 
 [project.scripts]
 roboml = "roboml.main:ray"

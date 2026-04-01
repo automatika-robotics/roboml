@@ -1,7 +1,11 @@
 from typing import Optional, AsyncGenerator
 
 import torch
-from transformers import AutoProcessor, AutoModelForVision2Seq, TextIteratorStreamer
+from transformers import (
+    AutoProcessor,
+    AutoModelForImageTextToText,
+    TextIteratorStreamer,
+)
 
 from PIL.Image import Image
 
@@ -26,7 +30,7 @@ class TransformersMLLM(TransformersLLM):
 
     def _initialize(
         self,
-        checkpoint: str = "HuggingFaceM4/idefics2-8b",
+        checkpoint: str = "Qwen/Qwen2.5-VL-3B-Instruct",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
     ) -> None:
@@ -42,11 +46,11 @@ class TransformersMLLM(TransformersLLM):
         """
         self.init_chat_prompt = system_prompt
         quantization_config = get_quantization_config(quantization, self.logger)
-        self.model = AutoModelForVision2Seq.from_pretrained(
+        self.model = AutoModelForImageTextToText.from_pretrained(
             checkpoint,
             quantization_config=quantization_config,
             low_cpu_mem_usage=(True if quantization_config else False),
-            torch_dtype=torch.float16,
+            dtype=torch.float16,
         )
         if not quantization_config:
             self.model.to(self.device)

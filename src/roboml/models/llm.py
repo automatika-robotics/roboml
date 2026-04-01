@@ -28,7 +28,7 @@ class TransformersLLM(ModelTemplate):
 
     def _initialize(
         self,
-        checkpoint: str = "microsoft/Phi-3-mini-4k-instruct",
+        checkpoint: str = "Qwen/Qwen3-0.6B",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
     ) -> None:
@@ -48,7 +48,7 @@ class TransformersLLM(ModelTemplate):
             checkpoint,
             quantization_config=quantization_config,
             low_cpu_mem_usage=(True if quantization_config else False),
-            torch_dtype=torch.float16,
+            dtype=torch.float16,
         )
         if not quantization_config:
             self.model.to(self.device)
@@ -122,9 +122,9 @@ class TransformersLLM(ModelTemplate):
         ]
 
         # Decode to get text
-        generated_text = self.pre_processor.batch_decode(
-            generated_ids, skip_special_tokens=True
-        )[0].strip()
+        generated_text = self.pre_processor.decode(
+            generated_ids[0], skip_special_tokens=True
+        ).strip()
 
         return {"output": generated_text}
 

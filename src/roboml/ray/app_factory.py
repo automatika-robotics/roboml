@@ -57,19 +57,6 @@ class AppFactory:
 
         if hasattr(models, node_model):
             module = getattr(models, node_model)
-        # add exception for VisionModel
-        elif node_model == "VisionModel":
-            try:
-                from roboml.models.vision import VisionModel
-            except ModuleNotFoundError as e:
-                logger.error(
-                    "In order to use vision models, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection following instructions given on this link, https://github.com/automatika-robotics/robml"
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail="In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection following instructions given on this link, https://github.com/automatika-robotics/robml",
-                ) from e
-            module = VisionModel
         else:
             logger.error(f"Requested node class {node_model} does not exist")
             raise HTTPException(

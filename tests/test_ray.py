@@ -1,4 +1,5 @@
 import logging
+import sys
 import time
 from multiprocessing import Process
 from websockets.sync.client import connect
@@ -6,7 +7,6 @@ import msgpack
 
 import httpx
 import pytest
-from roboml.main import ray
 
 HOST = "localhost"
 PORT = 8000
@@ -14,12 +14,20 @@ MODEL_NAME = "test"
 MODEL_TYPE = "TransformersLLM"
 
 
+def _start_ray_server():
+    """Start ray server in a subprocess with clean sys.argv."""
+    sys.argv = ["roboml"]
+    from roboml.main import ray
+
+    ray()
+
+
 @pytest.fixture(scope="module", autouse=True)
 def run_before_and_after_tests():
     """Fixture to run ray before tests are run"""
 
     # start server
-    p = Process(target=ray)
+    p = Process(target=_start_ray_server)
     p.start()
 
     # give it 20 seconds to start before sending request

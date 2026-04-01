@@ -1,3 +1,4 @@
+import sys
 import msgpack_numpy as m_pack
 import msgpack
 import pytest
@@ -6,14 +7,20 @@ from redis import Redis
 import time
 import logging
 
-from roboml.main import resp
-
 # patch msgpack for numpy
 m_pack.patch()
 
 
-MODEL_TYPE = "SpeechT5"
+MODEL_TYPE = "TransformersTTS"
 MODEL_NAME = "test"
+
+
+def _start_resp_server():
+    """Start RESP server in a subprocess with clean sys.argv."""
+    sys.argv = ["roboml-resp"]
+    from roboml.main import resp
+
+    resp()
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -22,7 +29,7 @@ def run_before_and_after_tests():
 
     # start server
     set_start_method("spawn", force=True)
-    p = Process(target=resp)
+    p = Process(target=_start_resp_server)
     p.start()
 
     # give it 10 seconds to start before sending request

@@ -24,7 +24,7 @@
 RoboML 是一个聚合包，用于快速部署面向机器人的开源机器学习模型。它设计用于满足两个基本用例：
 
 - **快速部署各种实用模型：** 本包封装了多个常用的机器学习库，如 🤗 [**Transformers**](https://github.com/huggingface/transformers)，可以快速将这些库中大多数开源模型部署在高度可扩展的服务端点上。
-- **部署检测与跟踪模型：** 通过 RoboML，您可以部署来自 [**MMDetection**](https://github.com/open-mmlab/mmdetection) 的所有检测模型，并支持无缝集成跟踪功能。
+- **部署检测与跟踪模型：** 通过 RoboML，您可以部署来自 🤗 [**Transformers**](https://huggingface.co/models?pipeline_tag=object-detection) 的检测模型（RT-DETR、DETR、Grounding DINO 等），并支持无缝集成跟踪功能。
 - **聚合机器人社区的专用模型：** RoboML 旨在成为一个机器人社区训练模型的聚合平台，尤其关注多模态模型在 ROS 控制与规划中的应用。参见 [ROS Agents](https://automatika-robotics.github.io/ros-agents) 了解更多信息。
 
 ## 模型与包装器

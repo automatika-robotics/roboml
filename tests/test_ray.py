@@ -89,6 +89,68 @@ def test_model_inference():
     assert response.status_code == 200
 
 
+def test_list_models():
+    """
+    Test OpenAI-compatible /v1/models endpoint
+    """
+    response = httpx.get(f"http://{HOST}:{PORT}/v1/models", timeout=10)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["object"] == "list"
+    assert any(m["id"] == MODEL_NAME for m in data["data"])
+
+
+def test_chat_completions():
+    """
+    Test OpenAI-compatible /v1/chat/completions endpoint
+    """
+    body = {
+        "messages": [{"role": "user", "content": "Say hello in one word."}],
+        "max_tokens": 20,
+        "temperature": 0.7,
+    }
+    response = httpx.post(
+        f"http://{HOST}:{PORT}/{MODEL_NAME}/v1/chat/completions",
+        json=body,
+        timeout=30,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["object"] == "chat.completion"
+    assert len(data["choices"]) == 1
+    assert data["choices"][0]["message"]["role"] == "assistant"
+    assert len(data["choices"][0]["message"]["content"]) > 0
+    logging.info(data["choices"][0]["message"]["content"])
+
+
+def test_chat_completions_streaming():
+    """
+    Test OpenAI-compatible streaming via SSE
+    """
+    body = {
+        "messages": [{"role": "user", "content": "Count to 3."}],
+        "max_tokens": 30,
+        "stream": True,
+    }
+    with httpx.stream(
+        "POST",
+        f"http://{HOST}:{PORT}/{MODEL_NAME}/v1/chat/completions",
+        json=body,
+        timeout=30,
+    ) as response:
+        assert response.status_code == 200
+        chunks = []
+        for line in response.iter_lines():
+            if line.startswith("data: "):
+                payload = line[6:]
+                if payload == "[DONE]":
+                    break
+                chunks.append(payload)
+
+    assert len(chunks) > 1  # at least role chunk + content chunks
+    logging.info(f"Received {len(chunks)} SSE chunks")
+
+
 def test_ws_model_inference():
     """
     Test model inference over websocket endpoint

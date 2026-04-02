@@ -1,4 +1,5 @@
 from typing import Optional, Union, Literal
+from uuid import uuid4
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -101,3 +102,62 @@ class DetectionInput(BaseModel):
         title="List of labels to track. Only used if tracking is enabled during initialization",
         default=None,
     )
+
+
+# OpenAI-compatible Chat Completions API interfaces
+class ChatCompletionRequest(BaseModel):
+    """OpenAI-compatible chat completion request."""
+
+    model: Optional[str] = Field(
+        default=None, title="Model name (unused, routed by URL)"
+    )
+    messages: list[dict] = Field(title="Chat messages", min_length=1)
+    max_tokens: int = Field(default=100, title="Maximum tokens to generate")
+    temperature: float = Field(default=0.7, title="Sampling temperature")
+    stream: bool = Field(default=False, title="Stream response via SSE")
+
+
+class ChatCompletionMessage(BaseModel):
+    """A single message in a chat completion response."""
+
+    role: str = "assistant"
+    content: str = ""
+
+
+class ChatCompletionChoice(BaseModel):
+    """A single choice in a chat completion response."""
+
+    index: int = 0
+    message: ChatCompletionMessage
+    finish_reason: str = "stop"
+
+
+class ChatCompletionResponse(BaseModel):
+    """OpenAI-compatible chat completion response."""
+
+    id: str = Field(default_factory=lambda: f"chatcmpl-{uuid4().hex[:12]}")
+    object: str = "chat.completion"
+    choices: list[ChatCompletionChoice]
+
+
+class ChatCompletionChunkDelta(BaseModel):
+    """Delta content in a streaming chunk."""
+
+    role: Optional[str] = None
+    content: Optional[str] = None
+
+
+class ChatCompletionChunkChoice(BaseModel):
+    """A single choice in a streaming chunk."""
+
+    index: int = 0
+    delta: ChatCompletionChunkDelta
+    finish_reason: Optional[str] = None
+
+
+class ChatCompletionChunk(BaseModel):
+    """OpenAI-compatible streaming chunk."""
+
+    id: str
+    object: str = "chat.completion.chunk"
+    choices: list[ChatCompletionChunkChoice]

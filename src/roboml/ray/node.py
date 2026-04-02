@@ -17,6 +17,17 @@ import inspect
 
 from . import app, ingress_decorator
 from roboml.models import ModelTemplate
+from roboml.interfaces import (
+    LLMInput,
+    VLLMInput,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    ChatCompletionChoice,
+    ChatCompletionMessage,
+    ChatCompletionChunk,
+    ChatCompletionChunkChoice,
+    ChatCompletionChunkDelta,
+)
 from roboml.utils import Status, logging
 
 # patch msgpack for numpy
@@ -24,6 +35,9 @@ m_pack.patch()
 
 # Define a constant for the chunk size (1MB)
 CHUNK_SIZE = 1 * 1024 * 1024
+
+# Model types that support chat completions
+CHAT_COMPATIBLE_INPUTS = (LLMInput, VLLMInput)
 
 
 @ingress_decorator
@@ -95,6 +109,139 @@ class RayNode:
         if isinstance(result, AsyncGenerator):
             return StreamingResponse(result, media_type="text/plain")
         return result
+
+    @app.post("/v1/chat/completions")
+    async def chat_completions(self, body: dict) -> Response:
+        """
+        OpenAI-compatible chat completions endpoint.
+        Translates between OpenAI format and internal LLMInput/VLLMInput.
+        """
+        if self.model.status is not Status.READY:
+            raise HTTPException(status_code=500, detail="Model not initialized")
+
+        if not issubclass(self.data_model, CHAT_COMPATIBLE_INPUTS):
+            raise HTTPException(
+                status_code=400,
+                detail="This model does not support chat completions. "
+                "Use /inference instead.",
+            )
+
+        try:
+            request = ChatCompletionRequest(**body)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=e.errors()) from e
+
+        # Translate OpenAI format to internal format
+        try:
+            internal_input = self._translate_chat_request(request)
+            result = self.model._inference(internal_input)
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=e.errors()) from e
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+        # Handle streaming
+        if isinstance(result, AsyncGenerator):
+            return StreamingResponse(
+                self._stream_chat_response(result),
+                media_type="text/event-stream",
+            )
+
+        # Wrap in OpenAI response format
+        text = result.get("output", "")
+        response = ChatCompletionResponse(
+            choices=[
+                ChatCompletionChoice(
+                    message=ChatCompletionMessage(content=str(text)),
+                )
+            ]
+        )
+        return Response(
+            content=response.model_dump_json(),
+            media_type="application/json",
+        )
+
+    def _translate_chat_request(self, request: ChatCompletionRequest) -> BaseModel:
+        """Translate OpenAI ChatCompletionRequest to internal LLMInput or VLLMInput."""
+        images = []
+        query = []
+
+        for msg in request.messages:
+            content = msg.get("content", "")
+
+            # Handle multimodal content (list of content parts)
+            if isinstance(content, list):
+                text_parts = []
+                for part in content:
+                    if part.get("type") == "text":
+                        text_parts.append(part.get("text", ""))
+                    elif part.get("type") == "image_url":
+                        url = part.get("image_url", {}).get("url", "")
+                        # Strip data URI prefix if present
+                        if url.startswith("data:"):
+                            url = url.split(",", 1)[-1]
+                        images.append(url)
+                query.append({
+                    "role": msg.get("role", "user"),
+                    "content": " ".join(text_parts),
+                })
+            else:
+                query.append({"role": msg.get("role", "user"), "content": content})
+
+        kwargs = {
+            "query": query,
+            "max_new_tokens": request.max_tokens,
+            "temperature": request.temperature,
+            "stream": request.stream,
+        }
+
+        if images and issubclass(self.data_model, VLLMInput):
+            kwargs["images"] = images
+            return VLLMInput(**kwargs)
+
+        return LLMInput(**kwargs)
+
+    async def _stream_chat_response(self, generator: AsyncGenerator):
+        """Wrap streaming tokens in OpenAI SSE format."""
+        from uuid import uuid4
+
+        stream_id = f"chatcmpl-{uuid4().hex[:12]}"
+
+        # First chunk with role
+        chunk = ChatCompletionChunk(
+            id=stream_id,
+            choices=[
+                ChatCompletionChunkChoice(
+                    delta=ChatCompletionChunkDelta(role="assistant"),
+                )
+            ],
+        )
+        yield f"data: {chunk.model_dump_json()}\n\n"
+
+        # Content chunks
+        async for token in generator:
+            chunk = ChatCompletionChunk(
+                id=stream_id,
+                choices=[
+                    ChatCompletionChunkChoice(
+                        delta=ChatCompletionChunkDelta(content=token),
+                    )
+                ],
+            )
+            yield f"data: {chunk.model_dump_json()}\n\n"
+
+        # Final chunk with finish_reason
+        chunk = ChatCompletionChunk(
+            id=stream_id,
+            choices=[
+                ChatCompletionChunkChoice(
+                    delta=ChatCompletionChunkDelta(),
+                    finish_reason="stop",
+                )
+            ],
+        )
+        yield f"data: {chunk.model_dump_json()}\n\n"
+        yield "data: [DONE]\n\n"
 
     async def _send_chunked(self, ws: WebSocket, data: str | bytes) -> None:
         """

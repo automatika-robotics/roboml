@@ -36,6 +36,20 @@ class AppFactory:
             "available_resources": available_resources(),
         }
 
+    @app.get("/v1/models")
+    def list_models(self) -> dict:
+        """List loaded models in OpenAI-compatible format.
+
+        :rtype: dict
+        """
+        return {
+            "object": "list",
+            "data": [
+                {"id": name, "object": "model", "owned_by": "roboml"}
+                for name in self.app_dict.keys()
+            ],
+        }
+
     @app.post("/add_node", status_code=201)
     def add_node(self, node_name: str, node_model: str) -> dict:
         """Add a model node.

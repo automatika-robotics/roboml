@@ -22,25 +22,23 @@
 RoboML is an aggregator package for quickly deploying open-source ML models for robots. It supports three main use cases:
 
 - **Rapid deployment of general-purpose models:** Wraps around popular ML libraries like 🤗 [**Transformers**](https://github.com/huggingface/transformers), allowing fast deployment of models through scalable server endpoints.
-- **Deploy detection models with tracking:** Supports deployment of all detection models in [**MMDetection**](https://github.com/open-mmlab/mmdetection) with optional tracking integration.
+- **Deploy detection models with tracking:** Supports deployment of detection models from 🤗 [**Transformers**](https://huggingface.co/models?pipeline_tag=object-detection) (RT-DETR, DETR, Grounding DINO, etc.) with optional tracking integration.
 - **Aggregate robot-specific models from the robotics community:** Intended as a platform for community-contributed multimodal models, usable in planning and control, especially with ROS components. See [EmbodiedAgents](https://automatika-robotics.github.io/embodied-agents).
 
 ## Models And Wrappers
 
-| **Model Class**    | **Description**                                                                                                       | **Default Checkpoint / Resource**                                                                                                                                                                            | **Key Init Parameters**                                                                                                                                              |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TransformersLLM`  | General-purpose large language model (LLM) from [🤗 Transformers](https://github.com/huggingface/transformers)        | [`microsoft/Phi-3-mini-4k-instruct`](https://huggingface.co/models?other=LLM)                                                                                                                                | `name`, `checkpoint`, `quantization`, `init_timeout`                                                                                                                 |
-| `TransformersMLLM` | Multimodal vision-language model (MLLM) from [🤗 Transformers](https://github.com/huggingface/transformers)           | [`HuggingFaceM4/idefics2-8b`](https://huggingface.co/models?pipeline_tag=image-text-to-text)                                                                                                                 | `name`, `checkpoint`, `quantization`, `init_timeout`                                                                                                                 |
-| `RoboBrain2`       | Embodied planning + multimodal reasoning via [RoboBrain 2.0](https://github.com/FlagOpen/RoboBrain2.0)                | [`BAAI/RoboBrain2.0-7B`](https://huggingface.co/collections/BAAI/robobrain20-6841eeb1df55c207a4ea0036)                                                                                                       | `name`, `checkpoint`, `init_timeout`                                                                                                                                 |
-| `Whisper`          | Multilingual speech-to-text (ASR) from [OpenAI Whisper](https://openai.com/index/whisper)                             | `small.en` ([checkpoint list](https://github.com/SYSTRAN/faster-whisper/blob/d3bfd0a305eb9d97c08047c82149c1998cc90fcb/faster_whisper/transcribe.py#L606))                                                    | `name`, `checkpoint`, `compute_type`, `init_timeout`                                                                                                                 |
-| `SpeechT5`         | Text-to-speech model from [Microsoft SpeechT5](https://github.com/microsoft/SpeechT5)                                 | `microsoft/speecht5_tts`                                                                                                                                                                                     | `name`, `checkpoint`, `voice`, `init_timeout`                                                                                                                        |
-| `Bark`             | Text-to-speech model from [SunoAI Bark](https://github.com/suno-ai/bark)                                              | [`suno/bark-small`](https://huggingface.co/collections/suno/bark-6502bdd89a612aa33a111bae), [voice options](https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c) | `name`, `checkpoint`, `voice`, `attn_implementation`, `init_timeout`                                                                                                 |
-| `MeloTTS`          | Multilingual text-to-speech via [MeloTTS](https://github.com/myshell-ai/MeloTTS/blob/main/docs/install.md#python-api) | `EN`, `EN-US`                                                                                                                                                                                                | `name`, `language`, `speaker_id`, `init_timeout`                                                                                                                     |
-| `VisionModel`      | Detection + tracking via [MMDetection](https://github.com/open-mmlab/mmdetection)                                     | [`dino-4scale_r50_8xb2-12e_coco`](https://github.com/open-mmlab/mmdetection?tab=readme-ov-file#overview-of-benchmark-and-model-zoo)                                                                          | `name`, `checkpoint`, `setup_trackers`, `cache_dir`, `tracking_distance_function`, `tracking_distance_threshold`, `deploy_tensorrt`, `_num_trackers`, `init_timeout` |
+| **Model Class**    | **Description**                                                                                                                           | **Default Checkpoint / Resource**                                                                                                                         | **Key Init Parameters**                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `TransformersLLM`  | General-purpose large language model (LLM) from [🤗 Transformers](https://github.com/huggingface/transformers)                            | [`Qwen/Qwen3-0.6B`](https://huggingface.co/models?other=LLM)                                                                             | `name`, `checkpoint`, `quantization`, `init_timeout`                                                  |
+| `TransformersMLLM` | Multimodal vision-language model (MLLM) from [🤗 Transformers](https://github.com/huggingface/transformers)                               | [`Qwen/Qwen2.5-VL-3B-Instruct`](https://huggingface.co/models?pipeline_tag=image-text-to-text)                                                              | `name`, `checkpoint`, `quantization`, `init_timeout`                                                  |
+| `RoboBrain2`       | Embodied planning + multimodal reasoning via [RoboBrain 2.0](https://github.com/FlagOpen/RoboBrain2.0)                                    | [`BAAI/RoboBrain2.0-3B`](https://huggingface.co/collections/BAAI/robobrain20-6841eeb1df55c207a4ea0036)                                                    | `name`, `checkpoint`, `init_timeout`                                                                  |
+| `Whisper`          | Multilingual speech-to-text (ASR) from [OpenAI Whisper](https://openai.com/index/whisper)                                                 | `small.en` ([checkpoint list](https://github.com/SYSTRAN/faster-whisper/blob/d3bfd0a305eb9d97c08047c82149c1998cc90fcb/faster_whisper/transcribe.py#L606)) | `name`, `checkpoint`, `compute_type`, `init_timeout`                                                  |
+| `TransformersTTS`  | Text-to-speech via [🤗 Transformers](https://huggingface.co/models?pipeline_tag=text-to-speech) (Bark, VITS, SpeechT5, SeamlessM4T, etc.) | [`suno/bark-small`](https://huggingface.co/models?pipeline_tag=text-to-speech)                                                                            | `name`, `checkpoint`, `voice`, `vocoder_checkpoint`, `init_timeout`                                   |
+| `VisionModel`      | Detection + tracking via [🤗 Transformers](https://huggingface.co/models?pipeline_tag=object-detection)                                   | [`PekingU/rtdetr_r50vd_coco_o365`](https://huggingface.co/models?pipeline_tag=object-detection)                                                         | `name`, `checkpoint`, `setup_trackers`, `tracking_distance_threshold`, `num_trackers`, `init_timeout` |
 
 ## Installation
 
-RoboML has been tested on Ubuntu 20.04 and later. A GPU with CUDA 12.1+ is recommended. If you encounter issues, please [open an issue](https://github.com/automatika-robotics/roboml/issues).
+RoboML has been tested on Ubuntu 20.04 and later. A GPU with CUDA 12.1+ is recommended. If you encounter problems, please [open an issue](https://github.com/automatika-robotics/roboml/issues).
 
 ```bash
 pip install roboml
@@ -57,37 +55,13 @@ pip install .
 
 ## Vision Model Support
 
-To use detection and tracking features via MMDetection:
+VisionModel uses HuggingFace Transformers for object detection and tracking. It works out of the box with any [HuggingFace object detection model](https://huggingface.co/models?pipeline_tag=object-detection) (RT-DETR, DETR, Grounding DINO, YOLOS, etc.). Object tracking via [ByteTrack](https://github.com/roboflow/trackers) is included.
 
-- Install RoboML with the vision extras:
+If `ffmpeg` or `libGL` is missing:
 
-  ```bash
-  pip install roboml[vision]
-  ```
-
-- Install `mmcv` using the appropriate CUDA and PyTorch versions as described in [their docs](https://mmcv.readthedocs.io/en/latest/get_started/installation.html). Example for PyTorch 2.1 with CUDA 12.1:
-
-  ```bash
-  pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-  ```
-
-- Install `mmdetection`:
-
-  ```bash
-  git clone https://github.com/open-mmlab/mmdetection.git
-  cd mmdetection
-  pip install -v -e .
-  ```
-
-- If `ffmpeg` or `libGL` is missing:
-
-  ```bash
-  sudo apt-get update && apt-get install ffmpeg libsm6 libxext6
-  ```
-
-### TensorRT-Based Model Deployment
-
-RoboML vision models can optionally be accelerated with NVIDIA TensorRT on Linux x86_64 systems. For setup, follow the [TensorRT installation guide](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html).
+```bash
+sudo apt-get update && apt-get install ffmpeg libsm6 libxext6
+```
 
 ## Docker Build (Recommended)
 

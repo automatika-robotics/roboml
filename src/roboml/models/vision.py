@@ -1,26 +1,20 @@
 from typing import Optional, Union
 
 import numpy as np
+import supervision as sv
 import torch
-from platformdirs import user_cache_dir
+from trackers import ByteTrackTracker
+from transformers import AutoImageProcessor, AutoModelForObjectDetection
 
 from roboml.interfaces import DetectionInput
-from ._base import ModelTemplate
+from roboml.utils import pre_process_images_to_pil
 
-from roboml.utils import (
-    get_mmdet_model,
-    pre_process_images_to_np,
-    convert_with_mmdeploy,
-)
-from mmdet.apis import init_detector
-from mmdet.utils import get_test_pipeline_cfg
-from mmcv.transforms import Compose
-from norfair import Detection, Tracker
+from ._base import ModelTemplate
 
 
 class VisionModel(ModelTemplate):
     """
-    Object detection models from MMDetection.
+    Object detection models from HuggingFace Transformers.
     """
 
     def __init__(self, **kwargs):
@@ -28,57 +22,40 @@ class VisionModel(ModelTemplate):
         :param kwargs:
         """
         super().__init__(**kwargs)
-        self.trackers: Optional[list[Tracker]] = None
+        self.trackers: Optional[list[ByteTrackTracker]] = None
 
     def _initialize(
         self,
-        checkpoint: str = "dino-4scale_r50_8xb2-12e_coco",
-        cache_dir: str = "mmdet",
+        checkpoint: str = "PekingU/rtdetr_r50vd_coco_o365",
         setup_trackers: bool = False,
         num_trackers: int = 1,
-        tracking_distance_function: str = "euclidean",
         tracking_distance_threshold: int = 30,
-        deploy_tensorrt: bool = False,
     ) -> None:
-        """_initialize.
-        :param cache_dir:
-        :type cache_dir: str
-        :param _:
+        """Initialize detection model.
+        :param checkpoint: HuggingFace model ID for object detection
+        :type checkpoint: str
+        :param setup_trackers: Enable object tracking
+        :type setup_trackers: bool
+        :param num_trackers: Number of tracker instances
+        :type num_trackers: int
+        :param tracking_distance_threshold: Distance threshold for tracking
+        :type tracking_distance_threshold: int
         :rtype: None
         """
-        self.deploy_tensorrt = deploy_tensorrt
-        # check if the checkpoint exists in cache else download it
-        cache = user_cache_dir(cache_dir)
-        config, weights = get_mmdet_model(cache, checkpoint, self.logger)
+        self.pre_processor = AutoImageProcessor.from_pretrained(checkpoint)
+        self.model = AutoModelForObjectDetection.from_pretrained(checkpoint)
+        self.model.to(self.device)
 
-        self.model = init_detector(config, weights, device=self.device)
-
-        self.data_classes = self.model.dataset_meta["classes"]
-
-        if deploy_tensorrt:
-            # deploy tensorrt version if asked
-            try:
-                import tensorrt
-            except ModuleNotFoundError as e:
-                raise ModuleNotFoundError(
-                    "NVIDIA tensorrt needs to be installed for TensorRT deployment. Find install instructions on this link https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html"
-                ) from e
-            self.logger.info(f"Found tensorrt version {tensorrt.__version__}")
-            self.model, self.input_shape, self.task_processor = convert_with_mmdeploy(
-                config, weights, self.device, cache
+        self.data_classes = getattr(self.model.config, "id2label", None)
+        if not self.data_classes:
+            self.logger.warning(
+                "No label mapping found in model config. Integer labels will be used."
             )
-        else:
-            # other build test pipeline
-            test_pipeline = get_test_pipeline_cfg(self.model.cfg)
-            test_pipeline[0].type = "mmdet.LoadImageFromNDArray"
-
-            self.test_pipeline = Compose(test_pipeline)
 
         if setup_trackers:
             self.trackers = [
-                Tracker(
-                    distance_function=tracking_distance_function,
-                    distance_threshold=tracking_distance_threshold,
+                ByteTrackTracker(
+                    minimum_iou_threshold=tracking_distance_threshold / 100.0,
                 )
                 for _ in range(num_trackers)
             ]
@@ -90,71 +67,66 @@ class VisionModel(ModelTemplate):
         :type data: DetectionInput
         :rtype: dict
         """
-
         get_dataset_labels = True if data.labels_to_track else data.get_dataset_labels
 
-        # pre-process images if strings received
-        images = pre_process_images_to_np(data.images)
-        detections = []
+        # pre-process images to PIL
+        pil_images = pre_process_images_to_pil(data.images)
 
-        for img in images:
-            if self.deploy_tensorrt:
-                model_inputs, _ = self.task_processor.create_input(
-                    img, self.input_shape
-                )
-                with torch.no_grad():
-                    # result is already a list
-                    detections += self.model.test_step(model_inputs)
-            else:
-                data_ = {"img": img}
-                # build the data pipeline
-                data_ = self.test_pipeline(data_)
+        # run through processor and model
+        inputs = self.pre_processor(images=pil_images, return_tensors="pt").to(
+            self.device
+        )
 
-                # mmdet preprocessing qwirks
-                data_["inputs"] = [data_["inputs"]]
-                data_["data_samples"] = [data_["data_samples"]]
+        with torch.no_grad():
+            outputs = self.model(**inputs)
 
-                with torch.no_grad():
-                    detections.append(self.model.test_step(data_)[0])
+        # compute target sizes for post-processing (height, width per image)
+        target_sizes = torch.tensor([[img.height, img.width] for img in pil_images]).to(
+            self.device
+        )
+
+        # post-process to get boxes in pixel coords
+        batch_results = self.pre_processor.post_process_object_detection(
+            outputs, target_sizes=target_sizes, threshold=data.threshold
+        )
 
         results = []
 
-        # filter and convert results from DetObject tensors to lists
-        for idx, detection in enumerate(detections):
-            result = {}
-            if "pred_instances" in detection and "bboxes" in detection.pred_instances:
-                scores = detection.pred_instances.scores.cpu().numpy()
-                labels = detection.pred_instances.labels.cpu().numpy()
-                bboxes = detection.pred_instances.bboxes.cpu().numpy()
-                scores, labels, bboxes = self._filter(
-                    data.threshold, scores, labels, bboxes
+        for idx, detection in enumerate(batch_results):
+            scores = detection["scores"].cpu().numpy()
+            labels = detection["labels"].cpu().numpy()
+            bboxes = detection["boxes"].cpu().numpy()
+
+            # Check if any predictions survived thresholding
+            if scores.size == 0:
+                results.append({})
+                continue
+
+            # get text labels from model config
+            if get_dataset_labels and self.data_classes:
+                labels_text = np.array([
+                    self.data_classes.get(int(label), str(label)) for label in labels
+                ])
+            else:
+                labels_text = labels
+
+            result = {
+                "bboxes": bboxes.tolist(),
+                "labels": labels_text.tolist(),
+                "scores": scores.tolist(),
+            }
+
+            if data.labels_to_track and self.trackers:
+                tracking_result = self._track(
+                    data.labels_to_track,
+                    self.trackers[idx],
+                    scores,
+                    labels_text,
+                    bboxes,
                 )
-                # Check if predictions survived thresholding
-                if not (scores.size == 0):
-                    # if labels are requested in text
-                    if get_dataset_labels:
-                        # get text labels from model dataset info
-                        labels = np.vectorize(
-                            lambda x: self.data_classes[x],
-                        )(labels)
+                result = result | tracking_result
 
-                result = {
-                    "bboxes": bboxes.tolist(),
-                    "labels": labels.tolist(),
-                    "scores": scores.tolist(),
-                }
-                if data.labels_to_track and self.trackers:
-                    tracking_result = self._track(
-                        data.labels_to_track,
-                        self.trackers[idx],
-                        scores,
-                        labels,
-                        bboxes,
-                    )
-                    result = result | tracking_result
-
-            if result:
-                results.append(result)
+            results.append(result)
 
         return {"output": results}
 
@@ -165,12 +137,10 @@ class VisionModel(ModelTemplate):
         labels: np.ndarray,
         bboxes: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Filter numpy arrays given threshold or another numpy array"""
+        """Filter numpy arrays given threshold or another numpy array."""
         if isinstance(criteria, float):
-            # filter by score threshold
             mask = scores >= criteria
         elif isinstance(criteria, np.ndarray):
-            # filter by labels
             mask = np.isin(labels, criteria)
         else:
             return scores, labels, bboxes
@@ -180,12 +150,12 @@ class VisionModel(ModelTemplate):
     def _track(
         self,
         labels_to_track: list,
-        tracker: Tracker,
+        tracker: ByteTrackTracker,
         scores: np.ndarray,
         labels: np.ndarray,
         bboxes: np.ndarray,
     ) -> dict:
-        """Object Tracking using norfair Tracker"""
+        """Object Tracking using ByteTrack via trackers library."""
         result = {}
         scores, labels, bboxes = self._filter(
             np.array(labels_to_track), scores, labels, bboxes
@@ -193,24 +163,30 @@ class VisionModel(ModelTemplate):
         # If labels being tracked dont exist, return
         if scores.size == 0:
             return result
-        detections_to_track = []
-        for label, bbox in zip(labels, bboxes, strict=False):
-            box = bbox.reshape(2, 2)
-            detections_to_track.append(
-                Detection(np.vstack([box, box.mean(axis=0)]), label=label)
-            )
 
-        tracked_objects = tracker.update(detections=detections_to_track)
+        # Build label-to-id mapping for class_id
+        unique_labels = list(set(labels.tolist()))
+        label_to_id = {label: i for i, label in enumerate(unique_labels)}
+        class_ids = np.array([label_to_id[label] for label in labels.tolist()])
 
-        if tracked_objects:
-            result["tracked_points"] = []
-            result["tracked_labels"] = []
-            result["ids"] = []
-            result["estimated_velocities"] = []
-            for obj in tracked_objects:
-                result["tracked_points"].append(obj.estimate.tolist())
-                result["tracked_labels"].append(obj.label)
-                result["ids"].append(obj.id)
-                result["estimated_velocities"].append(obj.estimate_velocity.tolist())
+        detections = sv.Detections(
+            xyxy=bboxes.astype(np.float32),
+            confidence=scores.astype(np.float32),
+            class_id=class_ids,
+        )
+
+        tracked = tracker.update(detections)
+
+        if len(tracked) > 0:
+            # compute center points from tracked bboxes
+            centers = (tracked.xyxy[:, :2] + tracked.xyxy[:, 2:]) / 2.0
+            # map class_ids back to label strings
+            id_to_label = {v: k for k, v in label_to_id.items()}
+            tracked_labels = [
+                id_to_label.get(cid, "") for cid in tracked.class_id.tolist()
+            ]
+            result["tracked_points"] = centers.tolist()
+            result["tracked_labels"] = tracked_labels
+            result["ids"] = tracked.tracker_id.tolist()
 
         return result

@@ -1,4 +1,5 @@
 import logging
+import sys
 import time
 from multiprocessing import Process
 from websockets.sync.client import connect
@@ -6,7 +7,6 @@ import msgpack
 
 import httpx
 import pytest
-from roboml.main import ray
 
 HOST = "localhost"
 PORT = 8000
@@ -14,12 +14,20 @@ MODEL_NAME = "test"
 MODEL_TYPE = "TransformersLLM"
 
 
+def _start_ray_server():
+    """Start ray server in a subprocess with clean sys.argv."""
+    sys.argv = ["roboml"]
+    from roboml.main import ray
+
+    ray()
+
+
 @pytest.fixture(scope="module", autouse=True)
 def run_before_and_after_tests():
     """Fixture to run ray before tests are run"""
 
     # start server
-    p = Process(target=ray)
+    p = Process(target=_start_ray_server)
     p.start()
 
     # give it 20 seconds to start before sending request
@@ -79,6 +87,68 @@ def test_model_inference():
     for chunk in response.iter_text(chunk_size=None):
         logging.info(chunk)
     assert response.status_code == 200
+
+
+def test_list_models():
+    """
+    Test OpenAI-compatible /v1/models endpoint
+    """
+    response = httpx.get(f"http://{HOST}:{PORT}/v1/models", timeout=10)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["object"] == "list"
+    assert any(m["id"] == MODEL_NAME for m in data["data"])
+
+
+def test_chat_completions():
+    """
+    Test OpenAI-compatible /v1/chat/completions endpoint
+    """
+    body = {
+        "messages": [{"role": "user", "content": "Say hello in one word."}],
+        "max_tokens": 20,
+        "temperature": 0.7,
+    }
+    response = httpx.post(
+        f"http://{HOST}:{PORT}/{MODEL_NAME}/v1/chat/completions",
+        json=body,
+        timeout=30,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["object"] == "chat.completion"
+    assert len(data["choices"]) == 1
+    assert data["choices"][0]["message"]["role"] == "assistant"
+    assert len(data["choices"][0]["message"]["content"]) > 0
+    logging.info(data["choices"][0]["message"]["content"])
+
+
+def test_chat_completions_streaming():
+    """
+    Test OpenAI-compatible streaming via SSE
+    """
+    body = {
+        "messages": [{"role": "user", "content": "Count to 3."}],
+        "max_tokens": 30,
+        "stream": True,
+    }
+    with httpx.stream(
+        "POST",
+        f"http://{HOST}:{PORT}/{MODEL_NAME}/v1/chat/completions",
+        json=body,
+        timeout=30,
+    ) as response:
+        assert response.status_code == 200
+        chunks = []
+        for line in response.iter_lines():
+            if line.startswith("data: "):
+                payload = line[6:]
+                if payload == "[DONE]":
+                    break
+                chunks.append(payload)
+
+    assert len(chunks) > 1  # at least role chunk + content chunks
+    logging.info(f"Received {len(chunks)} SSE chunks")
 
 
 def test_ws_model_inference():

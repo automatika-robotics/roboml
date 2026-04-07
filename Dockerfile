@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu24.04
 
 # setup environment
 ENV LANG=C.UTF-8
@@ -8,16 +8,9 @@ WORKDIR /roboml
 
 COPY . .
 
-RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && pip install pip-tools && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip install .[vision]
+RUN pip install --break-system-packages .
 
-# Install vision dependencies
-RUN pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-WORKDIR /
-RUN git clone https://github.com/open-mmlab/mmdetection.git && pip install -v -e mmdetection/
-
-WORKDIR /roboml
-
-# clean up
-RUN rm -rf mmdetection roboml
+# clean up source
+RUN rm -rf /roboml

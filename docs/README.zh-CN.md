@@ -24,21 +24,19 @@
 RoboML 是一个聚合包，用于快速部署面向机器人的开源机器学习模型。它设计用于满足两个基本用例：
 
 - **快速部署各种实用模型：** 本包封装了多个常用的机器学习库，如 🤗 [**Transformers**](https://github.com/huggingface/transformers)，可以快速将这些库中大多数开源模型部署在高度可扩展的服务端点上。
-- **部署检测与跟踪模型：** 通过 RoboML，您可以部署来自 [**MMDetection**](https://github.com/open-mmlab/mmdetection) 的所有检测模型，并支持无缝集成跟踪功能。
+- **部署检测与跟踪模型：** 通过 RoboML，您可以部署来自 🤗 [**Transformers**](https://huggingface.co/models?pipeline_tag=object-detection) 的检测模型（RT-DETR、DETR、Grounding DINO 等），并支持无缝集成跟踪功能。
 - **聚合机器人社区的专用模型：** RoboML 旨在成为一个机器人社区训练模型的聚合平台，尤其关注多模态模型在 ROS 控制与规划中的应用。参见 [ROS Agents](https://automatika-robotics.github.io/ros-agents) 了解更多信息。
 
 ## 模型与包装器
 
 | **モデルクラス名** | **説明**                                                                                                         | **デフォルトチェックポイント / リソース**                                                                                                                                                                 | **主な初期化パラメータ**                                                                                                                                             |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TransformersLLM`  | 一般的な大規模言語モデル（LLM）。[🤗 Transformers](https://github.com/huggingface/transformers) に基づく         | [`microsoft/Phi-3-mini-4k-instruct`](https://huggingface.co/models?other=LLM)                                                                                                                             | `name`、`checkpoint`、`quantization`、`init_timeout`                                                                                                                 |
-| `TransformersMLLM` | マルチモーダル画像・言語モデル（MLLM）。[🤗 Transformers](https://github.com/huggingface/transformers) に基づく  | [`HuggingFaceM4/idefics2-8b`](https://huggingface.co/models?pipeline_tag=image-text-to-text)                                                                                                              | `name`、`checkpoint`、`quantization`、`init_timeout`                                                                                                                 |
-| `RoboBrain2`       | [RoboBrain 2.0](https://github.com/FlagOpen/RoboBrain2.0) による長期計画とマルチモーダル推論モデル               | [`BAAI/RoboBrain2.0-7B`](https://huggingface.co/collections/BAAI/robobrain20-6841eeb1df55c207a4ea0036)                                                                                                    | `name`、`checkpoint`、`init_timeout`                                                                                                                                 |
+| `TransformersLLM`  | 汎用大規模言語モデル（LLM）。[🤗 Transformers](https://github.com/huggingface/transformers) に基づく             | [`Qwen/Qwen3-0.6B`](https://huggingface.co/models?other=LLM)                                                                                                                                              | `name`、`checkpoint`、`quantization`、`init_timeout`                                                                                                                 |
+| `TransformersMLLM` | マルチモーダル画像・言語モデル（MLLM）。[🤗 Transformers](https://github.com/huggingface/transformers) に基づく  | [`Qwen/Qwen2.5-VL-3B-Instruct`](https://huggingface.co/models?pipeline_tag=image-text-to-text)                                                                                                            | `name`、`checkpoint`、`quantization`、`init_timeout`                                                                                                                 |
+| `RoboBrain2`       | [RoboBrain 2.0](https://github.com/FlagOpen/RoboBrain2.0) による長期計画とマルチモーダル推論モデル               | [`BAAI/RoboBrain2.0-3B`](https://huggingface.co/collections/BAAI/robobrain20-6841eeb1df55c207a4ea0036)                                                                                                    | `name`、`checkpoint`、`init_timeout`                                                                                                                                 |
 | `Whisper`          | [OpenAI Whisper](https://openai.com/index/whisper) による多言語音声認識（ASR）モデル                             | `small.en`（[チェックポイント一覧](https://github.com/SYSTRAN/faster-whisper/blob/d3bfd0a305eb9d97c08047c82149c1998cc90fcb/faster_whisper/transcribe.py#L606)）                                           | `name`、`checkpoint`、`compute_type`、`init_timeout`                                                                                                                 |
-| `SpeechT5`         | [Microsoft SpeechT5](https://github.com/microsoft/SpeechT5) によるテキスト読み上げ（TTS）モデル                  | `microsoft/speecht5_tts`                                                                                                                                                                                  | `name`、`checkpoint`、`voice`、`init_timeout`                                                                                                                        |
-| `Bark`             | [SunoAI Bark](https://github.com/suno-ai/bark) によるテキスト読み上げ（TTS）モデル                               | [`suno/bark-small`](https://huggingface.co/collections/suno/bark-6502bdd89a612aa33a111bae)、[音声の種類](https://suno-ai.notion.site/8b8e8749ed514b0cbf3f699013548683?v=bc67cff786b04b50b3ceb756fd05f68c) | `name`、`checkpoint`、`voice`、`attn_implementation`、`init_timeout`                                                                                                 |
-| `MeloTTS`          | [MeloTTS](https://github.com/myshell-ai/MeloTTS/blob/main/docs/install.md#python-api) による多言語音声合成モデル | 言語: `EN`、話者ID: `EN-US`                                                                                                                                                                               | `name`、`language`、`speaker_id`、`init_timeout`                                                                                                                     |
-| `VisionModel`      | [MMDetection](https://github.com/open-mmlab/mmdetection) に基づく物体検出・追跡モデル                            | [`dino-4scale_r50_8xb2-12e_coco`](https://github.com/open-mmlab/mmdetection?tab=readme-ov-file#overview-of-benchmark-and-model-zoo)                                                                       | `name`、`checkpoint`、`setup_trackers`、`cache_dir`、`tracking_distance_function`、`tracking_distance_threshold`、`deploy_tensorrt`、`_num_trackers`、`init_timeout` |
+| `TransformersTTS`  | [🤗 Transformers](https://huggingface.co/models?pipeline_tag=text-to-speech) によるテキスト読み上げ（TTS）モデル（Bark、VITS、SpeechT5、SeamlessM4T 等） | [`suno/bark-small`](https://huggingface.co/models?pipeline_tag=text-to-speech)                                                                                                    | `name`、`checkpoint`、`voice`、`vocoder_checkpoint`、`init_timeout`                                                                                                  |
+| `VisionModel`      | [🤗 Transformers](https://huggingface.co/models?pipeline_tag=object-detection) に基づく物体検出・追跡モデル      | [`PekingU/rtdetr_r50vd_coco_o365`](https://huggingface.co/models?pipeline_tag=object-detection)                                                                                                            | `name`、`checkpoint`、`setup_trackers`、`tracking_distance_threshold`、`num_trackers`、`init_timeout`                                                                |
 
 ## 安装
 
@@ -59,37 +57,13 @@ pip install .
 
 ## 支持视觉模型
 
-如果您希望使用 MMDetection 库中的视觉检测与跟踪模型，请按以下步骤安装依赖项：
+VisionModel 使用 HuggingFace Transformers 进行物体检测和跟踪。支持任意 [HuggingFace 物体检测模型](https://huggingface.co/models?pipeline_tag=object-detection)（RT-DETR、DETR、Grounding DINO、YOLOS 等），并内置 [ByteTrack](https://github.com/roboflow/trackers) 跟踪功能。
 
-- 使用 vision 选项安装 RoboML：
+如果系统缺少 ffmpeg 和 libGL，请执行以下命令：
 
-  ```bash
-  pip install roboml[vision]
-  ```
-
-- 按照 [mmcv 安装说明](https://mmcv.readthedocs.io/en/latest/get_started/installation.html) 进行安装。以 PyTorch 2.1 和 CUDA 12.1 为例：
-
-  ```bash
-  pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-  ```
-
-- 安装 mmdetection：
-
-  ```bash
-  git clone https://github.com/open-mmlab/mmdetection.git
-  cd mmdetection
-  pip install -v -e .
-  ```
-
-- 如果系统缺少 ffmpeg 和 libGL，请执行以下命令：
-
-  ```bash
-  sudo apt-get update && apt-get install ffmpeg libsm6 libxext6
-  ```
-
-### 基于 TensorRT 的模型部署
-
-RoboML 中的视觉模型可通过 NVIDIA TensorRT 进行加速推理（需具备 NVIDIA GPU 支持）。当前仅支持基于 Linux 的 x86_64 系统。请参考 [官方安装指南](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html)。
+```bash
+sudo apt-get update && apt-get install ffmpeg libsm6 libxext6
+```
 
 ## Docker 构建（推荐方式）
 

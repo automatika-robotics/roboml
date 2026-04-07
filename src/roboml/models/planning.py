@@ -1,3 +1,4 @@
+import os
 import re
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
@@ -26,7 +27,7 @@ class RoboBrain2(ModelTemplate):
 
     def _initialize(
         self,
-        checkpoint: str = "BAAI/RoboBrain2.0-7B",
+        checkpoint: str = "BAAI/RoboBrain2.0-3B",
     ) -> None:
         """Initialize Model.
 
@@ -38,8 +39,14 @@ class RoboBrain2(ModelTemplate):
         :type history_reset_phrase: str
         :rtype: None
         """
+        if not os.environ.get("HF_TOKEN"):
+            raise ValueError(
+                "This model is gated on HF hub. To use it:\n\n"
+                f"  1. Request access on the model page: https://huggingface.co/{checkpoint}\n"
+                "  2. Set your auth token: export HF_TOKEN='your_token_from_huggingface'\n"
+            )
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            checkpoint, torch_dtype="auto"
+            checkpoint, dtype="auto"
         ).to(self.device)
 
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
@@ -84,7 +91,7 @@ class RoboBrain2(ModelTemplate):
             for in_ids, out_ids in zip(inputs.input_ids, generated_ids, strict=True)
         ]
 
-        generated_text = self.pre_processor.batch_decode(
+        generated_text = self.pre_processor.decode(
             generated_ids_trimmed,
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,

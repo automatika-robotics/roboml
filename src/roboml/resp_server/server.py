@@ -113,18 +113,6 @@ class Server:
             return f"Warning: Name duplication. A model/db with name {node_name} already exists."
         if hasattr(models, node_model):
             module = getattr(models, node_model)
-        # Add exception for VisionModel
-        elif node_model == "VisionModel":
-            try:
-                from roboml.models.vision import VisionModel
-            except ModuleNotFoundError as e:
-                self.logger.error(
-                    "In order to use vision models, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection as explained here, https://github.com/automatika-robotics/robml"
-                )
-                raise ModuleNotFoundError(
-                    "In order to use VisionModel, install roboml with `pip install roboml[vision]` and install mmcv and mmdetection as explained here, https://github.com/automatika-robotics/robml"
-                ) from e
-            module = VisionModel
         else:
             self.logger.error(f"Requested node class {node_model} does not exist")
             raise ModuleNotFoundError(

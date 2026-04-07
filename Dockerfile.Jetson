@@ -1,4 +1,7 @@
-FROM dustynv/transformers:r36.2.0
+FROM dustynv/pytorch:2.7-r36.4.0
+
+# Jetson Orin: JetPack 6.x, CUDA 12.8, Python 3.10+, PyTorch 2.7
+# PyTorch and torchvision are pre-installed in the base image
 
 # setup environment
 ENV LANG=C.UTF-8
@@ -8,25 +11,9 @@ WORKDIR /roboml
 
 COPY . .
 
-RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && pip install pip-tools && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Update pytorch, transformers and torchvision in the base container for torch 2.4
-RUN pip install -U transformers
-RUN python3 -m pip install --no-cache https://pypi.jetson-ai-lab.dev/jp6/cu122/+f/caa/8de487371c7f6/torch-2.4.0-cp310-cp310-linux_aarch64.whl#sha256=caa8de487371c7f66b566025700635c30728032e0a3acf1c3183cec7c2787f94
-RUN python3 -m pip install --no-cache https://pypi.jetson-ai-lab.dev/jp6/cu122/+f/8c0/114b6c62bfa3d/torchvision-0.19.0a0+48b1edf-cp310-cp310-linux_aarch64.whl#sha256=8c0114b6c62bfa3d60d08b51f1467e0ea1ee4916e5b4b1084db50c2c1f345d93
+RUN pip3 install .
 
-# Install bitsandbytes
-RUN python3 -m pip install --no-cache https://pypi.jetson-ai-lab.dev/jp6/cu122/+f/ebd/441cbfcc6f03f/bitsandbytes-0.44.1-cp310-cp310-linux_aarch64.whl#sha256=ebd441cbfcc6f03f13f7a17117391aae47521d694fc738cc7616529454b0e224
-
-# Test pytorch
-RUN python3 -c 'import torch'
-
-RUN pip install .[vision]
-
-# Install vision dependencies
-RUN pip install mmcv==2.1.0 -f https://download.openmmlab.com/mmcv/dist/cu121/torch2.1/index.html
-WORKDIR /
-RUN git clone https://github.com/open-mmlab/mmdetection.git && pip install -v mmdetection/
-
-# clean up
-RUN rm -rf mmdetection roboml
+# clean up source
+RUN rm -rf /roboml

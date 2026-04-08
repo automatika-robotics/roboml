@@ -185,6 +185,7 @@ class VisionModel(ModelTemplate):
             tracked_labels = [
                 id_to_label.get(cid, "") for cid in tracked.class_id.tolist()
             ]
+            result["tracked_bboxes"] = tracked.xyxy.tolist()
             result["tracked_points"] = centers.tolist()
             result["tracked_labels"] = tracked_labels
             result["ids"] = tracked.tracker_id.tolist()

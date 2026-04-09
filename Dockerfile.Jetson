@@ -13,7 +13,12 @@ COPY . .
 
 RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install .
+# Override pip index to PyPI (base image defaults to unreachable pypi.jetson-ai-lab.dev).
+RUN pip3 install -i https://pypi.org/simple --extra-index-url https://pypi.ngc.nvidia.com .
+# Force numpy<2 — the base image's PyTorch was compiled against NumPy 1.x
+# and crashes with NumPy 2.x. Must be done after install since pip's resolver
+# ignores the pin due to transitive dependencies requiring numpy>=2.
+RUN pip3 install -i https://pypi.org/simple "numpy<2"
 
 # clean up source
 RUN rm -rf /roboml

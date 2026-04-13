@@ -149,10 +149,63 @@ def test_planning(loaded_img):
         task="grounding",
         images=[loaded_img],
     )
+    data_pointing = PlanningInput(
+        query=[{"role": "user", "content": "The pickles"}],
+        task="pointing",
+        images=[loaded_img],
+    )
+    data_affordance = PlanningInput(
+        query=[{"role": "user", "content": "Pick up the sandwich"}],
+        task="affordance",
+        images=[loaded_img],
+    )
+    data_trajectory = PlanningInput(
+        query=[{"role": "user", "content": "Move to the glass"}],
+        task="trajectory",
+        images=[loaded_img],
+    )
+    # Test general — output should be a string
     result = run_model(
         RoboBrain2,
-        inputs=[data_general, data_grounding],
+        inputs=[data_general],
         log_output=True,
     )
     assert "output" in result
     assert "thinking" in result
+    assert isinstance(result["output"], str)
+
+    # Test grounding — output should be list of [x1, y1, x2, y2] boxes
+    result = run_model(
+        RoboBrain2,
+        inputs=[data_grounding],
+        log_output=True,
+    )
+    assert "output" in result
+    assert isinstance(result["output"], list)
+
+    # Test pointing — output should be list of (x, y) tuples
+    result = run_model(
+        RoboBrain2,
+        inputs=[data_pointing],
+        log_output=True,
+    )
+    assert "output" in result
+    assert isinstance(result["output"], list)
+
+    # Test affordance — output should be list of [x1, y1, x2, y2] boxes
+    result = run_model(
+        RoboBrain2,
+        inputs=[data_affordance],
+        log_output=True,
+    )
+    assert "output" in result
+    assert isinstance(result["output"], list)
+
+    # Test trajectory — output should be list of point lists
+    result = run_model(
+        RoboBrain2,
+        inputs=[data_trajectory],
+        log_output=True,
+    )
+    assert "output" in result
+    assert isinstance(result["output"], list)

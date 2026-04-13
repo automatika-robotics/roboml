@@ -51,6 +51,9 @@ class RoboBrain2(ModelTemplate):
 
         self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
 
+        # Only 7B+ models support thinking mode
+        self.supports_thinking = "3B" not in checkpoint
+
     def _inference(self, data: PlanningInput) -> dict:
         """Model inference.
         :param data:
@@ -63,12 +66,13 @@ class RoboBrain2(ModelTemplate):
             prompt, tokenize=False, add_generation_prompt=True
         )
 
-        # Enable thinking if required
-        text = (
-            f"{text}<think>"
-            if data.enable_thinking
-            else f"{text}<think></think><answer>"
-        )
+        # Only append thinking tags for models that support it (7B+)
+        if self.supports_thinking:
+            text = (
+                f"{text}<think>"
+                if data.enable_thinking
+                else f"{text}<think></think><answer>"
+            )
 
         # process images
         images = pre_process_images_to_pil(data.images)
@@ -91,31 +95,22 @@ class RoboBrain2(ModelTemplate):
             for in_ids, out_ids in zip(inputs.input_ids, generated_ids, strict=True)
         ]
 
-        generated_text = self.pre_processor.decode(
+        generated_text = self.pre_processor.batch_decode(
             generated_ids_trimmed,
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,
-        )
+        )[0]
 
-        if data.enable_thinking:
-            thinking_text = (
-                generated_text[0].split("</think>")[0].replace("<think>", "").strip()
-            )
+        # Parse thinking and answer from output
+        if self.supports_thinking and "</think>" in generated_text:
+            parts = generated_text.split("</think>", 1)
+            thinking_text = parts[0].replace("<think>", "").strip()
             answer_text = (
-                generated_text[0]
-                .split("</think>")[1]
-                .replace("<answer>", "")
-                .replace("</answer>", "")
-                .strip()
+                parts[1].replace("<answer>", "").replace("</answer>", "").strip()
             )
         else:
             thinking_text = ""
-            answer_text = (
-                generated_text[0]
-                .replace("<answer>", "")
-                .replace("</answer>", "")
-                .strip()
-            )
+            answer_text = generated_text.strip()
 
         answer = self._extract_output(answer_text, data.task)
 

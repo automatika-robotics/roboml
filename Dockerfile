@@ -10,6 +10,9 @@ COPY . .
 
 RUN apt-get update && apt-get install -y python3 python3-pip ffmpeg libsm6 libxext6 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Pin torch to CUDA 12.8 to match the base image (default wheel needs a newer driver).
+RUN pip install --break-system-packages torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
 RUN pip install --break-system-packages .
 
 # clean up source

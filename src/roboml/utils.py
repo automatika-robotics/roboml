@@ -1,6 +1,7 @@
 import base64
 import inspect
 import logging
+import os
 from enum import Enum
 from functools import wraps
 from io import BytesIO
@@ -91,6 +92,96 @@ def post_process_audio(
         return audio_bytes
 
     return base64.b64encode(audio_bytes).decode("utf-8")
+
+
+class CheckpointSource(Enum):
+    """Hub from which model checkpoints are downloaded."""
+
+    HUGGINGFACE = "huggingface"
+    MODELSCOPE = "modelscope"
+
+
+# First-party ModelScope alternatives for default checkpoints
+# that are only available on HuggingFace Hub
+MODELSCOPE_ALTERNATIVES = {
+    "suno/bark-small": "microsoft/speecht5_tts",
+    "suno/bark": "microsoft/speecht5_tts",
+    "PekingU/rtdetr_r50vd_coco_o365": "facebook/detr-resnet-50",
+}
+
+
+def get_checkpoint_source(source: Optional[str] = None) -> str:
+    """Get the effective checkpoint source.
+
+    Precedence: explicit source param > ROBOML_SOURCE env var > huggingface.
+
+    :param source:
+    :type source: Optional[str]
+    :rtype: str
+    """
+    source = (
+        source or os.environ.get("ROBOML_SOURCE") or CheckpointSource.HUGGINGFACE.value
+    )
+    valid_sources = {s.value for s in CheckpointSource}
+    if source not in valid_sources:
+        raise ValueError(
+            f"Invalid checkpoint source '{source}'. "
+            f"Valid values are {sorted(valid_sources)}. "
+            "Check the `source` init parameter or the ROBOML_SOURCE environment variable."
+        )
+    return source
+
+
+def resolve_checkpoint(
+    checkpoint: str,
+    source: Optional[str] = None,
+    logger: logging.Logger = logger,
+) -> str:
+    """Resolve a checkpoint ID to something from_pretrained can load.
+
+    For huggingface the checkpoint ID is passed through unchanged and
+    downloading is left to the underlying library. For modelscope the
+    checkpoint is downloaded with modelscope.snapshot_download and the
+    local directory is returned.
+
+    :param checkpoint:
+    :type checkpoint: str
+    :param source:
+    :type source: Optional[str]
+    :param logger:
+    :type logger: logging.Logger
+    :rtype: str
+    """
+    if get_checkpoint_source(source) != CheckpointSource.MODELSCOPE.value:
+        return checkpoint
+
+    try:
+        from modelscope import snapshot_download
+    except ImportError as e:
+        raise ImportError(
+            "Downloading checkpoints from ModelScope requires the modelscope package. "
+            "Install it with: pip install roboml[modelscope]"
+        ) from e
+
+    logger.info(f"Downloading checkpoint {checkpoint} from ModelScope hub")
+    try:
+        checkpoint_dir = snapshot_download(checkpoint)
+    except Exception as e:
+        hint = MODELSCOPE_ALTERNATIVES.get(checkpoint)
+        hint_msg = (
+            f" '{checkpoint}' is not available on ModelScope. "
+            f"Consider using '{hint}' instead, or set source to 'huggingface'."
+            if hint
+            else (
+                " If the model is restricted on ModelScope, log in by setting "
+                "the MODELSCOPE_API_TOKEN environment variable."
+            )
+        )
+        raise RuntimeError(
+            f"Failed to download checkpoint {checkpoint} from ModelScope.{hint_msg}"
+        ) from e
+    logger.info(f"Checkpoint downloaded to {checkpoint_dir}")
+    return checkpoint_dir
 
 
 class Quantization(Enum):

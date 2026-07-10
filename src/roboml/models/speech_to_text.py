@@ -1,11 +1,26 @@
 import base64
+from typing import Literal, Optional
+
 import numpy as np
 
 from faster_whisper import WhisperModel
 
 from roboml.interfaces import SpeechToTextInput
+from roboml.utils import CheckpointSource, get_checkpoint_source, resolve_checkpoint
 
 from ._base import ModelTemplate
+
+
+def _map_size_alias(checkpoint: str) -> str:
+    """Map a faster-whisper size alias (e.g. 'small.en') to its repo ID.
+
+    :param checkpoint:
+    :type checkpoint: str
+    :rtype: str
+    """
+    from faster_whisper.utils import _MODELS
+
+    return _MODELS.get(checkpoint, checkpoint)
 
 
 class Whisper(ModelTemplate):
@@ -17,10 +32,26 @@ class Whisper(ModelTemplate):
         self,
         checkpoint: str = "small.en",
         compute_type: str = "int8",
+        source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """
         Initializes the model.
+
+        :param checkpoint: Model size alias (e.g. 'small.en'), repo ID or local path
+        :type checkpoint: str
+        :param compute_type:
+        :type compute_type: str
+        :param source: Hub to download the checkpoint from. Defaults to the
+            ROBOML_SOURCE environment variable or huggingface
+        :type source: Optional[Literal["huggingface", "modelscope"]]
+        :rtype: None
         """
+        # For ModelScope, map size aliases to their Systran repo IDs and
+        # download explicitly; faster-whisper only knows how to pull from HF hub
+        if get_checkpoint_source(source) == CheckpointSource.MODELSCOPE.value:
+            checkpoint = resolve_checkpoint(
+                _map_size_alias(checkpoint), source, self.logger
+            )
         self.model = WhisperModel(
             checkpoint,
             device=self.device,

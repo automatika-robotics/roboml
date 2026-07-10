@@ -44,6 +44,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = ["httpx", "pip-tools", "pytest", "pre-commit", "redis", "lark"]
+modelscope = ["modelscope>=1.20"]
 
 [project.scripts]
 roboml = "roboml.main:ray"

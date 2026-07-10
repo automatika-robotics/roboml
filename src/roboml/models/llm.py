@@ -1,4 +1,4 @@
-from typing import Optional, AsyncGenerator
+from typing import Literal, Optional, AsyncGenerator
 from queue import Empty
 import asyncio
 
@@ -7,7 +7,7 @@ from PIL.Image import Image
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 
 from roboml.interfaces import LLMInput
-from roboml.utils import get_quantization_config
+from roboml.utils import get_quantization_config, resolve_checkpoint
 
 from ._base import ModelTemplate
 
@@ -31,6 +31,7 @@ class TransformersLLM(ModelTemplate):
         checkpoint: str = "Qwen/Qwen3-0.6B",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
+        source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize Model.
 
@@ -40,9 +41,13 @@ class TransformersLLM(ModelTemplate):
         :type quantization: Optional[str]
         :param init_chat_prompt:
         :type init_chat_prompt: str
+        :param source: Hub to download the checkpoint from. Defaults to the
+            ROBOML_SOURCE environment variable or huggingface
+        :type source: Optional[Literal["huggingface", "modelscope"]]
         :rtype: None
         """
         self.init_chat_prompt = system_prompt
+        checkpoint = resolve_checkpoint(checkpoint, source, self.logger)
         quantization_config = get_quantization_config(quantization, self.logger)
         self.model = AutoModelForCausalLM.from_pretrained(
             checkpoint,

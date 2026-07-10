@@ -27,14 +27,14 @@ RoboML is an aggregator package for quickly deploying open-source ML models for 
 
 ## Models And Wrappers
 
-| **Model Class**    | **Description**                                                                                                                           | **Default Checkpoint / Resource**                                                                                                                         | **Key Init Parameters**                                                                               |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `TransformersLLM`  | General-purpose large language model (LLM) from [🤗 Transformers](https://github.com/huggingface/transformers)                            | [`Qwen/Qwen3-0.6B`](https://huggingface.co/models?other=LLM)                                                                             | `name`, `checkpoint`, `quantization`, `init_timeout`                                                  |
-| `TransformersMLLM` | Multimodal vision-language model (MLLM) from [🤗 Transformers](https://github.com/huggingface/transformers)                               | [`Qwen/Qwen2.5-VL-3B-Instruct`](https://huggingface.co/models?pipeline_tag=image-text-to-text)                                                              | `name`, `checkpoint`, `quantization`, `init_timeout`                                                  |
-| `RoboBrain2`       | Embodied planning + multimodal reasoning via [RoboBrain 2.0](https://github.com/FlagOpen/RoboBrain2.0)                                    | [`BAAI/RoboBrain2.0-3B`](https://huggingface.co/collections/BAAI/robobrain20-6841eeb1df55c207a4ea0036)                                                    | `name`, `checkpoint`, `init_timeout`                                                                  |
-| `Whisper`          | Multilingual speech-to-text (ASR) from [OpenAI Whisper](https://openai.com/index/whisper)                                                 | `small.en` ([checkpoint list](https://github.com/SYSTRAN/faster-whisper/blob/d3bfd0a305eb9d97c08047c82149c1998cc90fcb/faster_whisper/transcribe.py#L606)) | `name`, `checkpoint`, `compute_type`, `init_timeout`                                                  |
-| `TransformersTTS`  | Text-to-speech via [🤗 Transformers](https://huggingface.co/models?pipeline_tag=text-to-speech) (Bark, VITS, SpeechT5, SeamlessM4T, etc.) | [`suno/bark-small`](https://huggingface.co/models?pipeline_tag=text-to-speech)                                                                            | `name`, `checkpoint`, `voice`, `vocoder_checkpoint`, `init_timeout`                                   |
-| `VisionModel`      | Detection + tracking via [🤗 Transformers](https://huggingface.co/models?pipeline_tag=object-detection)                                   | [`PekingU/rtdetr_r50vd_coco_o365`](https://huggingface.co/models?pipeline_tag=object-detection)                                                         | `name`, `checkpoint`, `setup_trackers`, `tracking_distance_threshold`, `num_trackers`, `init_timeout` |
+| **Model Class**    | **Description**                                                                                                                           | **Default Checkpoint / Resource**                                                                                                                         | **Key Init Parameters**                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `TransformersLLM`  | General-purpose large language model (LLM) from [🤗 Transformers](https://github.com/huggingface/transformers)                            | [`Qwen/Qwen3-0.6B`](https://huggingface.co/models?other=LLM)                                                                                              | `name`, `checkpoint`, `quantization`, `source`, `init_timeout`                                                  |
+| `TransformersMLLM` | Multimodal vision-language model (MLLM) from [🤗 Transformers](https://github.com/huggingface/transformers)                               | [`Qwen/Qwen2.5-VL-3B-Instruct`](https://huggingface.co/models?pipeline_tag=image-text-to-text)                                                            | `name`, `checkpoint`, `quantization`, `source`, `init_timeout`                                                  |
+| `RoboBrain2`       | Embodied planning + multimodal reasoning via [RoboBrain 2.0](https://github.com/FlagOpen/RoboBrain2.0)                                    | [`BAAI/RoboBrain2.0-3B`](https://huggingface.co/collections/BAAI/robobrain20-6841eeb1df55c207a4ea0036)                                                    | `name`, `checkpoint`, `source`, `init_timeout`                                                                  |
+| `Whisper`          | Multilingual speech-to-text (ASR) from [OpenAI Whisper](https://openai.com/index/whisper)                                                 | `small.en` ([checkpoint list](https://github.com/SYSTRAN/faster-whisper/blob/d3bfd0a305eb9d97c08047c82149c1998cc90fcb/faster_whisper/transcribe.py#L606)) | `name`, `checkpoint`, `compute_type`, `source`, `init_timeout`                                                  |
+| `TransformersTTS`  | Text-to-speech via [🤗 Transformers](https://huggingface.co/models?pipeline_tag=text-to-speech) (Bark, VITS, SpeechT5, SeamlessM4T, etc.) | [`suno/bark-small`](https://huggingface.co/models?pipeline_tag=text-to-speech)                                                                            | `name`, `checkpoint`, `voice`, `vocoder_checkpoint`, `source`, `init_timeout`                                   |
+| `VisionModel`      | Detection + tracking via [🤗 Transformers](https://huggingface.co/models?pipeline_tag=object-detection)                                   | [`PekingU/rtdetr_r50vd_coco_o365`](https://huggingface.co/models?pipeline_tag=object-detection)                                                           | `name`, `checkpoint`, `setup_trackers`, `tracking_distance_threshold`, `num_trackers`, `source`, `init_timeout` |
 
 ## Installation
 
@@ -52,6 +52,31 @@ virtualenv venv && source venv/bin/activate
 pip install pip-tools
 pip install .
 ```
+
+## Model Checkpoints from ModelScope
+
+By default, RoboML downloads model checkpoints from the [HuggingFace Hub](https://huggingface.co/models). However, users can pull checkpoints from [ModelScope (魔搭社区)](https://modelscope.cn) instead. First install the optional dependency (the Docker images below already include it):
+
+```bash
+pip install "roboml[modelscope]"
+```
+
+Then either set the source globally when starting the server:
+
+```bash
+ROBOML_SOURCE=modelscope roboml
+# or with Docker: docker run -e ROBOML_SOURCE=modelscope ...
+```
+
+or per model, by passing `source: "modelscope"` in the body of the model's `/initialize` call. An explicit `source` parameter always overrides the environment variable.
+
+ModelScope checkpoints are cached in `~/.cache/modelscope` (configurable via `MODELSCOPE_CACHE`), so the cache mount shown in the Docker section covers them as well.
+
+Most default checkpoints are available on ModelScope under the same IDs they have on the HuggingFace Hub, and Whisper size aliases such as `small.en` are resolved automatically. If a checkpoint cannot be found on ModelScope, model initialization fails with a descriptive error that suggests a suitable alternative checkpoint whenever one is known.
+
+Some checkpoints are restricted on ModelScope (e.g. `BAAI/RoboBrain2.0-*`) and cannot be downloaded anonymously. For these, set the `MODELSCOPE_API_TOKEN` environment variable with an access token from your [ModelScope account](https://modelscope.cn/my/myaccesstoken).
+
+Models that only exist on HuggingFace Hub can still be reached by routing HF downloads through a mirror, e.g. `HF_ENDPOINT=https://hf-mirror.com` (a community-run proxy; must be set before the server starts). This works independently of `ROBOML_SOURCE`, since every model node can choose its own `source`.
 
 ## Vision Model Support
 

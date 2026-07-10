@@ -55,6 +55,31 @@ pip install pip-tools
 pip install .
 ```
 
+## 从魔搭（ModelScope）下载模型检查点
+
+RoboML 默认从 [HuggingFace Hub](https://huggingface.co/models) 下载模型检查点。中国大陆用户可以改从 [魔搭社区（ModelScope）](https://modelscope.cn) 下载。首先安装可选依赖（下文介绍的 Docker 镜像已包含该依赖）：
+
+```bash
+pip install "roboml[modelscope]"
+```
+
+然后可以在启动服务时通过环境变量全局设置下载源：
+
+```bash
+ROBOML_SOURCE=modelscope roboml
+# Docker 方式：docker run -e ROBOML_SOURCE=modelscope ...
+```
+
+也可以针对单个模型，在调用 `/initialize` 时在请求体中传入 `source: "modelscope"`。显式传入的 `source` 参数始终优先于环境变量。
+
+ModelScope 检查点缓存在 `~/.cache/modelscope`（可通过 `MODELSCOPE_CACHE` 环境变量修改），因此 Docker 部分所示的缓存挂载同样适用。
+
+大多数默认检查点在 ModelScope 上使用与 HuggingFace Hub 相同的 ID，Whisper 的尺寸别名（如 `small.en`）也会自动解析。如果某个检查点在 ModelScope 上不可用，模型初始化会失败并给出清晰的错误提示，并在已知的情况下推荐可用的替代检查点（例如文本转语音可使用 `microsoft/speecht5_tts`）。
+
+部分模型在 ModelScope 上受限（如 `BAAI/RoboBrain2.0-*`），无法匿名下载。此类模型需要设置 `MODELSCOPE_API_TOKEN` 环境变量，访问令牌可在 [ModelScope 账号设置](https://modelscope.cn/my/myaccesstoken) 中获取。
+
+仅存在于 HuggingFace Hub 的模型，也可以通过镜像站下载，例如在启动服务前设置 `HF_ENDPOINT=https://hf-mirror.com`（社区维护的镜像代理，需在服务启动前设置）。该设置与 `ROBOML_SOURCE` 相互独立，每个模型节点都可以选择自己的 `source`。
+
 ## 支持视觉模型
 
 VisionModel 使用 HuggingFace Transformers 进行物体检测和跟踪。支持任意 [HuggingFace 物体检测模型](https://huggingface.co/models?pipeline_tag=object-detection)（RT-DETR、DETR、Grounding DINO、YOLOS 等），并内置 [ByteTrack](https://github.com/roboflow/trackers) 跟踪功能。

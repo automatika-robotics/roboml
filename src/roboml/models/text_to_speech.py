@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 import torch
 from transformers import (
@@ -9,7 +9,7 @@ from transformers import (
 )
 
 from roboml.interfaces import TextToSpeechInput
-from roboml.utils import post_process_audio
+from roboml.utils import post_process_audio, resolve_checkpoint
 
 from ._base import ModelTemplate
 
@@ -37,6 +37,7 @@ class TransformersTTS(ModelTemplate):
         checkpoint: str = "suno/bark-small",
         voice: Optional[str] = "v2/en_speaker_6",
         vocoder_checkpoint: Optional[str] = None,
+        source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize TTS model.
         :param checkpoint: HuggingFace model ID
@@ -47,9 +48,15 @@ class TransformersTTS(ModelTemplate):
             If not provided and a spectrogram model is loaded, defaults to
             'microsoft/speecht5_hifigan'.
         :type vocoder_checkpoint: Optional[str]
+        :param source: Hub to download checkpoints from. Defaults to the
+            ROBOML_SOURCE environment variable or huggingface. Note: the default
+            checkpoint is not available on ModelScope, use e.g.
+            microsoft/speecht5_tts instead
+        :type source: Optional[Literal["huggingface", "modelscope"]]
         :rtype: None
         """
         self.voice = voice
+        checkpoint = resolve_checkpoint(checkpoint, source, self.logger)
 
         # Try loading as waveform model first, fall back to spectrogram
         try:
@@ -66,7 +73,11 @@ class TransformersTTS(ModelTemplate):
             self.logger.info(f"Loaded spectrogram model: {checkpoint}")
 
             # Load vocoder for spectrogram models
-            vocoder_id = vocoder_checkpoint or "microsoft/speecht5_hifigan"
+            vocoder_id = resolve_checkpoint(
+                vocoder_checkpoint or "microsoft/speecht5_hifigan",
+                source,
+                self.logger,
+            )
             from transformers import SpeechT5HifiGan
 
             self.vocoder = SpeechT5HifiGan.from_pretrained(vocoder_id).to(self.device)

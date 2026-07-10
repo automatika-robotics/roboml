@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import numpy as np
 import supervision as sv
@@ -7,7 +7,7 @@ from trackers import ByteTrackTracker
 from transformers import AutoImageProcessor, AutoModelForObjectDetection
 
 from roboml.interfaces import DetectionInput
-from roboml.utils import pre_process_images_to_pil
+from roboml.utils import pre_process_images_to_pil, resolve_checkpoint
 
 from ._base import ModelTemplate
 
@@ -30,6 +30,7 @@ class VisionModel(ModelTemplate):
         setup_trackers: bool = False,
         num_trackers: int = 1,
         tracking_distance_threshold: int = 30,
+        source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize detection model.
         :param checkpoint: HuggingFace model ID for object detection
@@ -40,8 +41,14 @@ class VisionModel(ModelTemplate):
         :type num_trackers: int
         :param tracking_distance_threshold: Distance threshold for tracking
         :type tracking_distance_threshold: int
+        :param source: Hub to download the checkpoint from. Defaults to the
+            ROBOML_SOURCE environment variable or huggingface. Note: the default
+            checkpoint is not available on ModelScope, use e.g.
+            facebook/detr-resnet-50 instead
+        :type source: Optional[Literal["huggingface", "modelscope"]]
         :rtype: None
         """
+        checkpoint = resolve_checkpoint(checkpoint, source, self.logger)
         self.pre_processor = AutoImageProcessor.from_pretrained(checkpoint)
         self.model = AutoModelForObjectDetection.from_pretrained(checkpoint)
         self.model.to(self.device)

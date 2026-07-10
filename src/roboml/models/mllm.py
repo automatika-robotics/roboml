@@ -1,4 +1,4 @@
-from typing import Optional, AsyncGenerator
+from typing import Literal, Optional, AsyncGenerator
 
 import torch
 from transformers import (
@@ -10,7 +10,11 @@ from transformers import (
 from PIL.Image import Image
 
 from roboml.interfaces import VLLMInput
-from roboml.utils import get_quantization_config, pre_process_images_to_pil
+from roboml.utils import (
+    get_quantization_config,
+    pre_process_images_to_pil,
+    resolve_checkpoint,
+)
 
 from .llm import TransformersLLM
 
@@ -33,6 +37,7 @@ class TransformersMLLM(TransformersLLM):
         checkpoint: str = "Qwen/Qwen2.5-VL-3B-Instruct",
         quantization: Optional[str] = "4bit",
         system_prompt: Optional[str] = "You are a helpful AI assistant.",
+        source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize Model.
 
@@ -42,9 +47,13 @@ class TransformersMLLM(TransformersLLM):
         :type quantization: Optional[str]
         :param history_reset_phrase:
         :type history_reset_phrase: str
+        :param source: Hub to download the checkpoint from. Defaults to the
+            ROBOML_SOURCE environment variable or huggingface
+        :type source: Optional[Literal["huggingface", "modelscope"]]
         :rtype: None
         """
         self.init_chat_prompt = system_prompt
+        checkpoint = resolve_checkpoint(checkpoint, source, self.logger)
         quantization_config = get_quantization_config(quantization, self.logger)
         self.model = AutoModelForImageTextToText.from_pretrained(
             checkpoint,

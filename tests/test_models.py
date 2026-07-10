@@ -62,6 +62,23 @@ def test_llm():
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_llm_from_modelscope():
+    """Test TransformersLLM pulling its checkpoint from ModelScope.
+    Requires the modelscope package (pip install roboml[modelscope])."""
+    pytest.importorskip("modelscope")
+    data = LLMInput(query=[{"role": "user", "content": "Whats up?"}])
+    result = run_model(
+        TransformersLLM,
+        init_kwargs={"source": "modelscope"},
+        inputs=[data],
+        log_output=True,
+    )
+    assert "output" in result
+    assert isinstance(result["output"], str)
+    assert len(result["output"]) > 0
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_mllm(loaded_img):
     """Test TransformersMLLM with default checkpoint."""
     data = VLLMInput(

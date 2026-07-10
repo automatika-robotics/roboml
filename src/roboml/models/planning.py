@@ -1,9 +1,17 @@
-import os
 import re
+from typing import Literal, Optional
+
 from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 
 from roboml.interfaces import PlanningInput
-from roboml.utils import pre_process_images_to_pil
+from roboml.utils import (
+    CheckpointSource,
+    get_checkpoint_source,
+    has_huggingface_credentials,
+    has_modelscope_credentials,
+    pre_process_images_to_pil,
+    resolve_checkpoint,
+)
 
 from ._base import ModelTemplate
 
@@ -28,28 +36,47 @@ class RoboBrain2(ModelTemplate):
     def _initialize(
         self,
         checkpoint: str = "BAAI/RoboBrain2.0-3B",
+        source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize Model.
 
         :param checkpoint:
         :type checkpoint: str
-        :param quantization:
-        :type quantization: Optional[str]
-        :param history_reset_phrase:
-        :type history_reset_phrase: str
+        :param source: Hub to download the checkpoint from. Defaults to the
+            ROBOML_SOURCE environment variable or huggingface. The model is
+            gated on HF hub (requires HF_TOKEN); on ModelScope it requires a
+            logged-in account instead (set MODELSCOPE_API_TOKEN)
+        :type source: Optional[Literal["huggingface", "modelscope"]]
         :rtype: None
         """
-        if not os.environ.get("HF_TOKEN"):
+        hub = get_checkpoint_source(source)
+        if (
+            hub == CheckpointSource.HUGGINGFACE.value
+            and not has_huggingface_credentials()
+        ):
             raise ValueError(
                 "This model is gated on HF hub. To use it:\n\n"
                 f"  1. Request access on the model page: https://huggingface.co/{checkpoint}\n"
                 "  2. Set your auth token: export HF_TOKEN='your_token_from_huggingface'\n"
+                "     (or log in once with: huggingface-cli login)\n"
             )
+        elif (
+            hub == CheckpointSource.MODELSCOPE.value
+            and not has_modelscope_credentials()
+        ):
+            raise ValueError(
+                "This model is restricted on ModelScope. To use it:\n\n"
+                "  1. Get an access token from your ModelScope account: "
+                "https://modelscope.cn/my/myaccesstoken\n"
+                "  2. Set the token: export MODELSCOPE_API_TOKEN='your_token_from_modelscope'\n"
+                "     (or log in once with: modelscope login)\n"
+            )
+        resolved_checkpoint = resolve_checkpoint(checkpoint, source, self.logger)
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            checkpoint, dtype="auto"
+            resolved_checkpoint, dtype="auto"
         ).to(self.device)
 
-        self.pre_processor = AutoProcessor.from_pretrained(checkpoint)
+        self.pre_processor = AutoProcessor.from_pretrained(resolved_checkpoint)
 
         # Only 7B+ models support thinking mode
         self.supports_thinking = "3B" not in checkpoint

@@ -132,6 +132,44 @@ def get_checkpoint_source(source: Optional[str] = None) -> str:
     return source
 
 
+def has_huggingface_credentials() -> bool:
+    """Check if HuggingFace credentials are available, either through the
+    HF_TOKEN environment variable or a cached `huggingface-cli login`.
+
+    Returns True when credentials cannot be determined, leaving the decision
+    to the download attempt.
+
+    :rtype: bool
+    """
+    if os.environ.get("HF_TOKEN"):
+        return True
+    try:
+        from huggingface_hub import get_token
+
+        return bool(get_token())
+    except Exception:
+        return True
+
+
+def has_modelscope_credentials() -> bool:
+    """Check if ModelScope credentials are available, either through the
+    MODELSCOPE_API_TOKEN environment variable or a cached `modelscope login`.
+
+    Returns True when credentials cannot be determined (e.g. older modelscope
+    versions), leaving the decision to the download attempt.
+
+    :rtype: bool
+    """
+    if os.environ.get("MODELSCOPE_API_TOKEN"):
+        return True
+    try:
+        from modelscope_hub.config import HubConfig
+
+        return bool(HubConfig().token)
+    except Exception:
+        return True
+
+
 def resolve_checkpoint(
     checkpoint: str,
     source: Optional[str] = None,

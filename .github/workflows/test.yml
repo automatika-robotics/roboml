@@ -34,4 +34,4 @@ jobs:
 
     - name: Run CI tests
       run: |
-        python -m pytest tests/test_imports.py tests/test_interfaces.py tests/test_utils.py tests/test_vision_unit.py tests/test_tts_unit.py tests/test_download.py tests/test_checkpoint_source.py -v
+        python -m pytest tests/test_imports.py tests/test_interfaces.py tests/test_utils.py tests/test_vision_unit.py tests/test_tts_unit.py tests/test_download.py tests/test_checkpoint_source.py tests/test_planning_unit.py -v

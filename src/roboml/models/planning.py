@@ -1,29 +1,169 @@
 import re
 from typing import Literal, Optional
 
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+from transformers import AutoModelForImageTextToText, AutoProcessor
 
 from roboml.interfaces import PlanningInput
-from roboml.utils import (
-    CheckpointSource,
-    get_checkpoint_source,
-    has_huggingface_credentials,
-    has_modelscope_credentials,
-    pre_process_images_to_pil,
-    resolve_checkpoint,
-)
+from roboml.utils import pre_process_images_to_pil, resolve_checkpoint
 
 from ._base import ModelTemplate
+
+# RoboBrain model families with differing prompt and output formats
+FAMILY_ROBOBRAIN20 = "robobrain2.0"
+FAMILY_ROBOBRAIN25 = "robobrain2.5"
+
+# transformers config model_type to model family
+_MODEL_TYPE_FAMILIES = {
+    "qwen2_5_vl": FAMILY_ROBOBRAIN20,
+    "qwen3_vl": FAMILY_ROBOBRAIN25,
+}
+
+
+def _detect_family(model_type: str, logger) -> str:
+    """Detect the RoboBrain family from the loaded model's config type.
+
+    :param model_type:
+    :type model_type: str
+    :param logger:
+    :rtype: str
+    """
+    family = _MODEL_TYPE_FAMILIES.get(model_type)
+    if family is None:
+        logger.warning(
+            f"Unknown model type '{model_type}' for the RoboBrain2 wrapper. "
+            "Assuming RoboBrain 2.5 prompt and output formats."
+        )
+        return FAMILY_ROBOBRAIN25
+    return family
+
+
+def _supports_thinking(family: str, checkpoint: str) -> bool:
+    """Thinking mode is only supported by RoboBrain 2.0 models of size 7B+.
+
+    :param family:
+    :type family: str
+    :param checkpoint:
+    :type checkpoint: str
+    :rtype: bool
+    """
+    return family == FAMILY_ROBOBRAIN20 and "3B" not in checkpoint
+
+
+def _build_task_text_v25(text: str, task: str) -> str:
+    """Task prompt templates from the official RoboBrain 2.5 inference code.
+
+    :param text:
+    :type text: str
+    :param task:
+    :type task: str
+    :rtype: str
+    """
+    # Affordance is handled as a pointing task in RoboBrain 2.5
+    if task in ("pointing", "affordance"):
+        return (
+            f"{text}. Please provide its 2D coordinates. Your answer should be "
+            "formatted as a tuple, i.e. [(x, y)], where the tuple contains the x "
+            "and y coordinates of a point satisfying the conditions above."
+        )
+    if task == "trajectory":
+        return (
+            "Please predict 3D end-effector-centric waypoints to complete the "
+            f'task successfully. The task is "{text}". Your answer should be '
+            "formatted as a list of tuples, i.e., [(x1, y1, d1), (x2, y2, d2), ...], "
+            "where each tuple contains the x and y coordinates and the depth of "
+            "the point."
+        )
+    if task == "grounding":
+        return f"Please provide the bounding box coordinate of the region this sentence describes: {text}."
+    return text
+
+
+def _build_task_text_v20(text: str, task: str) -> str:
+    """Task prompt templates from the official RoboBrain 2.0 inference code.
+
+    :param text:
+    :type text: str
+    :param task:
+    :type task: str
+    :rtype: str
+    """
+    if task == "pointing":
+        return f"{text}. Your answer should be formatted as a list of tuples, i.e. [(x1, y1), (x2, y2), ...], where each tuple contains the x and y coordinates of a point satisfying the conditions above. The coordinates should indicate the normalized pixel locations of the points in the image."
+    if task == "affordance":
+        return f'You are a robot using the joint control. The task is "{text}". Please predict a possible affordance area of the end effector.'
+    if task == "trajectory":
+        return f'You are a robot using the joint control. The task is "{text}". Please predict up to 10 key trajectory points to complete the task. Your answer should be formatted as a list of tuples, i.e. [[x1, y1], [x2, y2], ...], where each tuple contains the x and y coordinates of a point.'
+    if task == "grounding":
+        return f"Please provide the bounding box coordinate of the region this sentence describes: {text}."
+    return text
+
+
+def _build_task_text(text: str, task: str, family: str) -> str:
+    """Apply the task specific prompt template of the given model family.
+
+    :param text:
+    :type text: str
+    :param task:
+    :type task: str
+    :param family:
+    :type family: str
+    :rtype: str
+    """
+    if family == FAMILY_ROBOBRAIN25:
+        return _build_task_text_v25(text, task)
+    return _build_task_text_v20(text, task)
+
+
+def _extract_structured_output(answer_text: str, task: str, family: str) -> str | list:
+    """Extract structured output from the answer text based on task and family.
+
+    :param answer_text:
+    :type answer_text: str
+    :param task:
+    :type task: str
+    :param family:
+    :type family: str
+    :rtype: str | list
+    """
+    try:
+        if task == "trajectory":
+            if family == FAMILY_ROBOBRAIN25:
+                # RoboBrain 2.5 predicts 3D waypoints with depth
+                trajectory_pattern = r"(\d+),\s*(\d+),\s*([+-]?\d+\.\d+)"
+                points = re.findall(trajectory_pattern, answer_text)
+                return [[(int(x), int(y), float(d)) for x, y, d in points]]
+            trajectory_pattern = r"(\d+),\s*(\d+)"
+            points = re.findall(trajectory_pattern, answer_text)
+            return [[(int(x), int(y)) for x, y in points]]
+        if task == "pointing" or (
+            task == "affordance" and family == FAMILY_ROBOBRAIN25
+        ):
+            point_pattern = r"\(\s*(\d+)\s*,\s*(\d+)\s*\)"
+            points = re.findall(point_pattern, answer_text)
+            return [(int(x), int(y)) for x, y in points]
+        if task in ("affordance", "grounding"):
+            box_pattern = r"\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]"
+            boxes = re.findall(box_pattern, answer_text)
+            return [[int(x1), int(y1), int(x2), int(y2)] for x1, y1, x2, y2 in boxes]
+        return answer_text
+    except Exception:
+        return "Error occured while extracting structured output"
 
 
 class RoboBrain2(ModelTemplate):
     """
-        RoboBrain2.0 by BAAI
+        RoboBrain 2.0 / 2.5 by BAAI
         @article{RoboBrain2.0TechnicalReport,
         title={RoboBrain 2.0 Technical Report},
         author={BAAI RoboBrain Team},
         journal={arXiv preprint arXiv:2507.02029},
         year={2025}
+    }
+        @article{tan2026robobrain25depthsight,
+      title={RoboBrain 2.5: Depth in Sight, Time in Mind},
+      author={Tan, Huajie and Zhou, Enshen and Li, Zhiyu and Xu, Yijie and Ji, Yuheng and Chen, Xiansheng and Chi, Cheng and Wang, Pengwei and Jia, Huizhu and Ao, Yulong and Cao, Mingyu and Chen, Sixiang and Li, Zhe and Liu, Mengzhen and Wang, Zixiao and Rong, Shanyu and Lyu, Yaoxu and Zhao, Zhongxia and Co, Peterson and Li, Yibo and Han, Yi and Xie, Shaoxuan and Yao, Guocai and Wang, Songjing and Zhang, Leiduo and Yang, Xi and Jiao, Yance and Shi, Donghai and Xie, Kunchang and Nie, Shaokai and Men, Chunlei and Lin, Yonghua and Wang, Zhongyuan and Huang, Tiejun and Zhang, Shanghang},
+      journal={arXiv preprint arXiv:2601.14352},
+      year={2026}
     }
     """
 
@@ -32,54 +172,41 @@ class RoboBrain2(ModelTemplate):
         :param kwargs:
         """
         super().__init__(**kwargs)
+        self.family: str = FAMILY_ROBOBRAIN25
+        self.supports_thinking: bool = False
 
     def _initialize(
         self,
-        checkpoint: str = "BAAI/RoboBrain2.0-3B",
+        checkpoint: str = "BAAI/RoboBrain2.5-4B",
         source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize Model.
 
+        Supports both RoboBrain 2.0 and RoboBrain 2.5 checkpoints; the family
+        is detected from the loaded model config.
+
+        RoboBrain 2.5 predicts 3D (x, y, depth) waypoints for the trajectory
+        task, returns points instead of boxes for the affordance task, and has
+        no thinking mode.
+
         :param checkpoint:
         :type checkpoint: str
         :param source: Hub to download the checkpoint from. Defaults to the
-            ROBOML_SOURCE environment variable or huggingface. The model is
-            gated on HF hub (requires HF_TOKEN); on ModelScope it requires a
-            logged-in account instead (set MODELSCOPE_API_TOKEN)
+            ROBOML_SOURCE environment variable or huggingface
         :type source: Optional[Literal["huggingface", "modelscope"]]
         :rtype: None
         """
-        hub = get_checkpoint_source(source)
-        if (
-            hub == CheckpointSource.HUGGINGFACE.value
-            and not has_huggingface_credentials()
-        ):
-            raise ValueError(
-                "This model is gated on HF hub. To use it:\n\n"
-                f"  1. Request access on the model page: https://huggingface.co/{checkpoint}\n"
-                "  2. Set your auth token: export HF_TOKEN='your_token_from_huggingface'\n"
-                "     (or log in once with: huggingface-cli login)\n"
-            )
-        elif (
-            hub == CheckpointSource.MODELSCOPE.value
-            and not has_modelscope_credentials()
-        ):
-            raise ValueError(
-                "This model is restricted on ModelScope. To use it:\n\n"
-                "  1. Get an access token from your ModelScope account: "
-                "https://modelscope.cn/my/myaccesstoken\n"
-                "  2. Set the token: export MODELSCOPE_API_TOKEN='your_token_from_modelscope'\n"
-                "     (or log in once with: modelscope login)\n"
-            )
         resolved_checkpoint = resolve_checkpoint(checkpoint, source, self.logger)
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        self.model = AutoModelForImageTextToText.from_pretrained(
             resolved_checkpoint, dtype="auto"
         ).to(self.device)
 
         self.pre_processor = AutoProcessor.from_pretrained(resolved_checkpoint)
 
-        # Only 7B+ models support thinking mode
-        self.supports_thinking = "3B" not in checkpoint
+        self.family = _detect_family(self.model.config.model_type, self.logger)
+        # Thinking mode is only supported by RoboBrain 2.0 models of 7B+
+        self.supports_thinking = _supports_thinking(self.family, checkpoint)
+        self.logger.info(f"Loaded {self.family} model from {checkpoint}")
 
     def _inference(self, data: PlanningInput) -> dict:
         """Model inference.
@@ -93,7 +220,7 @@ class RoboBrain2(ModelTemplate):
             prompt, tokenize=False, add_generation_prompt=True
         )
 
-        # Only append thinking tags for models that support it (7B+)
+        # Only append thinking tags for models that support it (2.0 family, 7B+)
         if self.supports_thinking:
             text = (
                 f"{text}<think>"
@@ -139,7 +266,7 @@ class RoboBrain2(ModelTemplate):
             thinking_text = ""
             answer_text = generated_text.strip()
 
-        answer = self._extract_output(answer_text, data.task)
+        answer = _extract_structured_output(answer_text, data.task, self.family)
 
         return {"output": answer, "thinking": thinking_text}
 
@@ -153,16 +280,8 @@ class RoboBrain2(ModelTemplate):
         for q in query[:-1]:
             q["content"] = [{"type": "text", "text": q["content"]}]
 
-        # Robobrain2.0 specific prompts
-        text = query[-1]["content"]  # Content of last message
-        if task == "pointing":
-            text = f"{text}. Your answer should be formatted as a list of tuples, i.e. [(x1, y1), (x2, y2), ...], where each tuple contains the x and y coordinates of a point satisfying the conditions above. The coordinates should indicate the normalized pixel locations of the points in the image."
-        elif task == "affordance":
-            text = f'You are a robot using the joint control. The task is "{text}". Please predict a possible affordance area of the end effector.'
-        elif task == "trajectory":
-            text = f'You are a robot using the joint control. The task is "{text}". Please predict up to 10 key trajectory points to complete the task. Your answer should be formatted as a list of tuples, i.e. [[x1, y1], [x2, y2], ...], where each tuple contains the x and y coordinates of a point.'
-        elif task == "grounding":
-            text = f"Please provide the bounding box coordinate of the region this sentence describes: {text}."
+        # RoboBrain family specific task prompts
+        text = _build_task_text(query[-1]["content"], task, self.family)
 
         # Add image tags to last message
         image_tags = [{"type": "image"} for _ in range(num_images)]
@@ -171,35 +290,3 @@ class RoboBrain2(ModelTemplate):
 
         self.logger.debug(f"Input to Model: {query}")
         return query
-
-    def _extract_output(self, answer_text: str, task: str) -> str | list:
-        """Extract output from the model's answer text based on the task."""
-        try:
-            if task == "trajectory":
-                # Extract trajectory points
-                trajectory_pattern = r"(\d+),\s*(\d+)"
-                trajectory_points = re.findall(trajectory_pattern, answer_text)
-                return [[(int(x), int(y)) for x, y in trajectory_points]]
-            elif task == "pointing":
-                # Extract points
-                point_pattern = r"\(\s*(\d+)\s*,\s*(\d+)\s*\)"
-                points = re.findall(point_pattern, answer_text)
-                return [(int(x), int(y)) for x, y in points]
-            elif task == "affordance":
-                # Extract bounding boxes
-                box_pattern = r"\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]"
-                boxes = re.findall(box_pattern, answer_text)
-                return [
-                    [int(x1), int(y1), int(x2), int(y2)] for x1, y1, x2, y2 in boxes
-                ]
-            elif task == "grounding":
-                # Extract bounding boxes
-                box_pattern = r"\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]"
-                boxes = re.findall(box_pattern, answer_text)
-                return [
-                    [int(x1), int(y1), int(x2), int(y2)] for x1, y1, x2, y2 in boxes
-                ]
-            else:
-                return answer_text
-        except Exception:
-            return "Error occured while extracting structured output"

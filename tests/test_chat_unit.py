@@ -6,21 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
+from roboml.chat import translate_chat_request
 from roboml.interfaces import ChatCompletionRequest, LLMInput, VLLMInput
 from roboml.models import TransformersMLLM
-from roboml.ray.node import RayNode
-
-
-class _StubNode:
-    """Carrier for the attributes _translate_chat_request reads."""
-
-    def __init__(self, data_model):
-        self.data_model = data_model
 
 
 def _translate(data_model, **request_kwargs):
-    request = ChatCompletionRequest(**request_kwargs)
-    return RayNode._translate_chat_request(_StubNode(data_model), request)
+    return translate_chat_request(ChatCompletionRequest(**request_kwargs), data_model)
 
 
 class TestChatRequestTranslation:

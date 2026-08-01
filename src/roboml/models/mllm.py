@@ -13,6 +13,7 @@ from roboml.interfaces import VLLMInput
 from roboml.utils import (
     get_quantization_config,
     pre_process_images_to_pil,
+    pre_process_videos,
     resolve_checkpoint,
 )
 
@@ -70,13 +71,24 @@ class TransformersMLLM(TransformersLLM):
         :param data:
         :param type: VLLMInput
         """
-        pil_images: list[Image] = pre_process_images_to_pil(data.images)
+        images = getattr(data, "images", None) or []
+        input_videos = getattr(data, "videos", None) or []
+
+        pil_images: Optional[list[Image]] = (
+            pre_process_images_to_pil(images) if images else None
+        )
+        videos, video_metadata = (
+            pre_process_videos(input_videos, data.video_fps, data.max_video_frames)
+            if input_videos
+            else (None, None)
+        )
         # create prompt
-        prompt = self.__create_prompt(data.query, len(data.images))
+        prompt = self.__create_prompt(data.query, len(images), len(input_videos))
 
         text = self.pre_processor.apply_chat_template(
             prompt, add_generation_prompt=True
         )
+
         if data.stream:
             streamer = TextIteratorStreamer(
                 self.pre_processor,
@@ -92,16 +104,26 @@ class TransformersMLLM(TransformersLLM):
                 data.temperature,
                 streamer,
                 pil_images,
+                videos,
+                video_metadata,
             )
             return self.consume_streamer(streamer)
 
         input_ids, generated_ids = self.generate_text(
-            text, data.max_new_tokens, data.temperature, None, pil_images
+            text,
+            data.max_new_tokens,
+            data.temperature,
+            None,
+            pil_images,
+            videos,
+            video_metadata,
         )
 
         return self.decode_output(input_ids, generated_ids)
 
-    def __create_prompt(self, query: list[dict], num_images: int) -> list:
+    def __create_prompt(
+        self, query: list[dict], num_images: int, num_videos: int = 0
+    ) -> list:
         """
         Creates a prompt specific to the model.
         :returns:   Engineered Prompt
@@ -118,9 +140,12 @@ class TransformersMLLM(TransformersLLM):
         for q in query[:-1]:
             q["content"] = [{"type": "text", "text": q["content"]}]
 
-        # Add image tags to last message
+        # Add video and image tags to last message
+        video_tags = [{"type": "video"} for _ in range(num_videos)]
         image_tags = [{"type": "image"} for _ in range(num_images)]
-        last_query = image_tags + [{"type": "text", "text": query[-1]["content"]}]
+        last_query = (
+            video_tags + image_tags + [{"type": "text", "text": query[-1]["content"]}]
+        )
         query[-1]["content"] = last_query
 
         prompt += query

@@ -31,6 +31,10 @@ dependencies = [
     "msgpack_numpy",
     "hiredis",
     "ray[serve]",
+    # NOTE: fastapi>=0.139.2 apps embed a threading.Lock and fail ray
+    # serve.ingress cloudpickle serialization. Fixed on ray master
+    # (ray-project/ray#64814); remove this pin once a ray release ships the fix
+    "fastapi<0.139.2",
     "datasets",
     "scipy",
     "ninja",

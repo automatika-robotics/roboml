@@ -58,6 +58,85 @@ def pre_process_images_to_np(
     return [np.array(PILImage.open(BytesIO(base64.b64decode(img)))) for img in data]
 
 
+def _decode_video(data: bytes) -> tuple[np.ndarray, Optional[float]]:
+    """Decode an encoded video (e.g. mp4) into an array of RGB frames.
+
+    :param data: encoded video bytes
+    :type data: bytes
+    :returns: frames in (T, H, W, C) layout and the container frame rate
+    :rtype: tuple[np.ndarray, Optional[float]]
+    """
+    import av
+
+    with av.open(BytesIO(data)) as container:
+        stream = container.streams.video[0]
+        fps = float(stream.average_rate) if stream.average_rate else None
+        frames = [
+            frame.to_ndarray(format="rgb24") for frame in container.decode(stream)
+        ]
+    if not frames:
+        raise ValueError("Could not decode any frames from the provided video")
+    return np.stack(frames), fps
+
+
+def pre_process_videos(
+    data: list[Union[str, bytes, np.ndarray]],
+    video_fps: Optional[float] = None,
+    max_video_frames: Optional[int] = None,
+) -> tuple[list[np.ndarray], Optional[list[dict]]]:
+    """Convert videos to frame arrays with metadata for model processors.
+
+    Videos given as base64 strings or bytes are decoded with PyAV and their
+    frame rate is read from the container. Videos given as numpy arrays are
+    assumed to be frames in (T, H, W, C) layout at video_fps frames per
+    second. Videos longer than max_video_frames are subsampled uniformly.
+
+    :param data: list of videos as base64 str, encoded bytes or frame arrays
+    :type data: list[str | bytes | np.ndarray]
+    :param video_fps: frame rate of videos provided as numpy arrays
+    :type video_fps: Optional[float]
+    :param max_video_frames: maximum number of frames kept per video
+    :type max_video_frames: Optional[int]
+    :returns: per-video frame arrays and matching metadata dicts, or None
+        metadata when the frame rate of any video is unknown
+    :rtype: tuple[list[np.ndarray], Optional[list[dict]]]
+    """
+    frames_list: list[np.ndarray] = []
+    metadata: list[dict] = []
+    fps_known = True
+
+    for video in data:
+        if isinstance(video, str):
+            video = base64.b64decode(video)
+        if isinstance(video, bytes):
+            frames, fps = _decode_video(video)
+        else:
+            frames, fps = np.asarray(video), video_fps
+
+        total_frames = len(frames)
+        if max_video_frames and total_frames > max_video_frames:
+            indices = (
+                np.linspace(0, total_frames - 1, max_video_frames).round().astype(int)
+            )
+            frames = frames[indices]
+            if fps:
+                # keep duration consistent with the reduced frame count
+                fps = fps * max_video_frames / total_frames
+
+        if fps:
+            metadata.append({
+                "fps": fps,
+                "total_num_frames": len(frames),
+                "duration": len(frames) / fps,
+            })
+        else:
+            fps_known = False
+
+        frames_list.append(frames)
+
+    return frames_list, metadata if fps_known else None
+
+
 def b64_str_to_bytes(data: str) -> bytes:
     """
     Returns bytes given a str

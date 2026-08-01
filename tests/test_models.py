@@ -91,6 +91,24 @@ def test_mllm(loaded_img):
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_mllm_video():
+    """Test TransformersMLLM with video input given as a frame array."""
+    import numpy as np
+
+    img = cv2.cvtColor(cv2.imread("tests/resources/test.jpeg"), cv2.COLOR_BGR2RGB)
+    frames = np.stack([img] * 8)
+    data = VLLMInput(
+        query=[{"role": "user", "content": "What do you see in this video?"}],
+        videos=[frames],
+        video_fps=4.0,
+        max_video_frames=8,
+    )
+    result = run_model(TransformersMLLM, inputs=[data], log_output=True)
+    assert "output" in result
+    assert isinstance(result["output"], str)
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_vision(loaded_img):
     """Test VisionModel with default RT-DETRv2 checkpoint."""
     data = DetectionInput(images=[loaded_img], threshold=0.5)

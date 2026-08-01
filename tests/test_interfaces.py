@@ -91,6 +91,67 @@ def test_vllm_input_valid():
     assert len(data.images) == 1
 
 
+def test_vllm_input_video_only():
+    """Test VLLMInput with a video and no images."""
+    from roboml.interfaces import VLLMInput
+
+    data = VLLMInput(
+        query=[{"role": "user", "content": "What happens in this video?"}],
+        videos=["aGVsbG8="],
+        video_fps=4.0,
+        max_video_frames=16,
+    )
+    assert data.images == []
+    assert len(data.videos) == 1
+    assert data.video_fps == 4.0
+    assert data.max_video_frames == 16
+
+
+def test_vllm_input_video_as_frames():
+    """Test VLLMInput with a video as a numpy frame array."""
+    from roboml.interfaces import VLLMInput
+
+    frames = np.zeros((8, 64, 64, 3), dtype=np.uint8)
+    data = VLLMInput(
+        query=[{"role": "user", "content": "Describe"}],
+        videos=[frames],
+    )
+    assert isinstance(data.videos[0], np.ndarray)
+    assert data.video_fps is None
+
+
+def test_vllm_input_images_and_videos():
+    """Test VLLMInput with both images and videos."""
+    from roboml.interfaces import VLLMInput
+
+    data = VLLMInput(
+        query=[{"role": "user", "content": "Compare"}],
+        images=["aGVsbG8="],
+        videos=["d29ybGQ="],
+    )
+    assert len(data.images) == 1
+    assert len(data.videos) == 1
+
+
+def test_vllm_input_no_visual_input_rejected():
+    """Test that VLLMInput rejects requests without images or videos."""
+    from roboml.interfaces import VLLMInput
+
+    with pytest.raises(ValidationError):
+        VLLMInput(query=[{"role": "user", "content": "Hello"}])
+
+    with pytest.raises(ValidationError):
+        VLLMInput(query=[{"role": "user", "content": "Hello"}], images=[], videos=[])
+
+
+def test_llm_input_default_max_new_tokens():
+    """Test the LLMInput max_new_tokens default."""
+    from roboml.interfaces import LLMInput
+
+    data = LLMInput(query=[{"role": "user", "content": "Hello"}])
+    assert data.max_new_tokens == 512
+
+
 def test_planning_input_validation():
     """Test PlanningInput task validation."""
     from roboml.interfaces import PlanningInput
@@ -109,6 +170,18 @@ def test_planning_input_validation():
             query=[{"role": "user", "content": "Point"}],
             images=["aGVsbG8=", "d29ybGQ="],
             task="pointing",
+        )
+
+    # planning models require images
+    with pytest.raises(ValidationError):
+        PlanningInput(query=[{"role": "user", "content": "Describe"}])
+
+    # planning models do not accept videos
+    with pytest.raises(ValidationError):
+        PlanningInput(
+            query=[{"role": "user", "content": "Describe"}],
+            images=["aGVsbG8="],
+            videos=["d29ybGQ="],
         )
 
 

@@ -49,7 +49,7 @@ class LLMInput(BaseModel):
 
     query: list[dict] = Field(title="Input to the model", min_length=1)
     max_new_tokens: int = Field(
-        title="Maximum number of new tokens to be generated", default=100
+        title="Maximum number of new tokens to be generated", default=512
     )
     temperature: float = Field(
         title="Temperature with which inference is to be generated", default=0.7
@@ -65,8 +65,28 @@ class VLLMInput(LLMInput):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     images: Union[list[str], list[np.ndarray]] = Field(
-        title="List of images as base64 strings or numpy arrays", min_length=1
+        title="List of images as base64 strings or numpy arrays", default=[]
     )
+    videos: list[Union[str, bytes, np.ndarray]] = Field(
+        title="List of videos, each as base64 string or raw bytes of an encoded video (e.g. mp4) or a numpy array of frames in (T, H, W, C) layout",
+        default=[],
+    )
+    video_fps: Optional[float] = Field(
+        title="Frame rate of videos provided as numpy frame arrays. For encoded videos the frame rate is read from the container",
+        default=None,
+        gt=0,
+    )
+    max_video_frames: Optional[int] = Field(
+        title="Maximum number of frames kept per video. Longer videos are subsampled uniformly",
+        default=None,
+        gt=0,
+    )
+
+    @model_validator(mode="after")
+    def validate_visual_input(self) -> "VLLMInput":
+        if not self.images and not self.videos:
+            raise ValueError("At least one image or video must be provided.")
+        return self
 
 
 class PlanningInput(VLLMInput):
@@ -79,6 +99,10 @@ class PlanningInput(VLLMInput):
 
     @model_validator(mode="after")
     def validate_task_and_images(self) -> "PlanningInput":
+        if self.videos:
+            raise ValueError("Video input is not supported for planning models.")
+        if not self.images:
+            raise ValueError("Planning models require at least one image.")
         if self.task != "general" and len(self.images) != 1:
             raise ValueError(
                 "Pointing, affordance, grounding, and trajectory tasks require exactly one image."
@@ -112,7 +136,7 @@ class ChatCompletionRequest(BaseModel):
         default=None, title="Model name (unused, routed by URL)"
     )
     messages: list[dict] = Field(title="Chat messages", min_length=1)
-    max_tokens: int = Field(default=100, title="Maximum tokens to generate")
+    max_tokens: int = Field(default=512, title="Maximum tokens to generate")
     temperature: float = Field(default=0.7, title="Sampling temperature")
     stream: bool = Field(default=False, title="Stream response via SSE")
 

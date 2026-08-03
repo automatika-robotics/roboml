@@ -16,11 +16,9 @@ from starlette.responses import StreamingResponse
 import inspect
 
 from . import app, ingress_decorator
-from roboml.chat import translate_chat_request
+from roboml.chat import is_chat_compatible, translate_chat_request
 from roboml.models import ModelTemplate
 from roboml.interfaces import (
-    LLMInput,
-    VLLMInput,
     ChatCompletionRequest,
     ChatCompletionResponse,
     ChatCompletionChoice,
@@ -36,9 +34,6 @@ m_pack.patch()
 
 # Define a constant for the chunk size (1MB)
 CHUNK_SIZE = 1 * 1024 * 1024
-
-# Model types that support chat completions
-CHAT_COMPATIBLE_INPUTS = (LLMInput, VLLMInput)
 
 
 @ingress_decorator
@@ -120,7 +115,7 @@ class RayNode:
         if self.model.status is not Status.READY:
             raise HTTPException(status_code=500, detail="Model not initialized")
 
-        if not issubclass(self.data_model, CHAT_COMPATIBLE_INPUTS):
+        if not is_chat_compatible(self.data_model):
             raise HTTPException(
                 status_code=400,
                 detail="This model does not support chat completions. "

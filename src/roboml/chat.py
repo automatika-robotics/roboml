@@ -3,7 +3,26 @@ model inputs."""
 
 from pydantic import BaseModel
 
-from roboml.interfaces import ChatCompletionRequest, LLMInput, VLLMInput
+from roboml.interfaces import (
+    ChatCompletionRequest,
+    LLMInput,
+    PlanningInput,
+    VLLMInput,
+)
+
+
+def is_chat_compatible(data_model: type[BaseModel]) -> bool:
+    """Whether a node input model can serve OpenAI chat completions.
+
+    Planning models are excluded due to being task specific.
+
+    :param data_model: Input model of the node handling the request
+    :type data_model: type[BaseModel]
+    :rtype: bool
+    """
+    return issubclass(data_model, (LLMInput, VLLMInput)) and not issubclass(
+        data_model, PlanningInput
+    )
 
 
 def translate_chat_request(

@@ -6,13 +6,33 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
-from roboml.chat import translate_chat_request
-from roboml.interfaces import ChatCompletionRequest, LLMInput, VLLMInput
+from roboml.chat import is_chat_compatible, translate_chat_request
+from roboml.interfaces import (
+    ChatCompletionRequest,
+    DetectionInput,
+    LLMInput,
+    PlanningInput,
+    VLLMInput,
+)
 from roboml.models import TransformersMLLM
 
 
 def _translate(data_model, **request_kwargs):
     return translate_chat_request(ChatCompletionRequest(**request_kwargs), data_model)
+
+
+class TestChatCompatibility:
+    def test_llm_and_mllm_inputs_are_compatible(self):
+        assert is_chat_compatible(LLMInput) is True
+        assert is_chat_compatible(VLLMInput) is True
+
+    def test_planning_input_is_excluded(self):
+        # PlanningInput subclasses VLLMInput but chat completions cannot
+        # express its task field; must gate to a 400, not crash with a 500
+        assert is_chat_compatible(PlanningInput) is False
+
+    def test_unrelated_inputs_are_excluded(self):
+        assert is_chat_compatible(DetectionInput) is False
 
 
 class TestChatRequestTranslation:

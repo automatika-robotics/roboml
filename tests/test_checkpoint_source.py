@@ -12,6 +12,7 @@ from roboml.utils import (
     get_checkpoint_source,
     has_huggingface_credentials,
     has_modelscope_credentials,
+    is_checkpoint_gated,
     resolve_checkpoint,
 )
 
@@ -34,6 +35,12 @@ def _fake_hub_config(monkeypatch, token):
 def clean_env(monkeypatch):
     """Ensure ROBOML_SOURCE is not set."""
     monkeypatch.delenv("ROBOML_SOURCE", raising=False)
+
+
+@pytest.fixture
+def no_gating(monkeypatch):
+    """Disable the gating hub lookup so resolver tests stay offline."""
+    monkeypatch.setattr("roboml.utils.is_checkpoint_gated", lambda *a, **k: False)
 
 
 @pytest.fixture
@@ -74,18 +81,20 @@ class TestGetCheckpointSource:
 
 
 class TestResolveCheckpoint:
-    def test_huggingface_passthrough(self, clean_env):
+    def test_huggingface_passthrough(self, clean_env, no_gating):
         assert resolve_checkpoint("Qwen/Qwen3-0.6B", "huggingface") == "Qwen/Qwen3-0.6B"
 
-    def test_default_source_passthrough(self, clean_env):
+    def test_default_source_passthrough(self, clean_env, no_gating):
         assert resolve_checkpoint("Qwen/Qwen3-0.6B") == "Qwen/Qwen3-0.6B"
 
-    def test_modelscope_returns_local_dir(self, clean_env, fake_modelscope):
+    def test_modelscope_returns_local_dir(self, clean_env, no_gating, fake_modelscope):
         result = resolve_checkpoint("Qwen/Qwen3-0.6B", "modelscope")
         assert result == "/fake/cache/Qwen/Qwen3-0.6B"
         assert fake_modelscope == ["Qwen/Qwen3-0.6B"]
 
-    def test_modelscope_source_from_env(self, clean_env, monkeypatch, fake_modelscope):
+    def test_modelscope_source_from_env(
+        self, clean_env, no_gating, monkeypatch, fake_modelscope
+    ):
         monkeypatch.setenv("ROBOML_SOURCE", "modelscope")
         result = resolve_checkpoint("Qwen/Qwen3-0.6B")
         assert result == "/fake/cache/Qwen/Qwen3-0.6B"
@@ -95,7 +104,7 @@ class TestResolveCheckpoint:
         with pytest.raises(ImportError, match=r"roboml\[modelscope\]"):
             resolve_checkpoint("Qwen/Qwen3-0.6B", "modelscope")
 
-    def test_download_failure_raises(self, clean_env, monkeypatch):
+    def test_download_failure_raises(self, clean_env, no_gating, monkeypatch):
         fake = types.ModuleType("modelscope")
 
         def failing_download(checkpoint):
@@ -107,7 +116,9 @@ class TestResolveCheckpoint:
         with pytest.raises(RuntimeError, match="Failed to download"):
             resolve_checkpoint("some/unknown-model", "modelscope")
 
-    def test_download_failure_hints_alternative(self, clean_env, monkeypatch):
+    def test_download_failure_hints_alternative(
+        self, clean_env, no_gating, monkeypatch
+    ):
         fake = types.ModuleType("modelscope")
 
         def failing_download(checkpoint):
@@ -125,6 +136,126 @@ class TestResolveCheckpoint:
     def test_alternatives_cover_known_missing_defaults(self):
         assert "suno/bark-small" in MODELSCOPE_ALTERNATIVES
         assert "PekingU/rtdetr_r50vd_coco_o365" in MODELSCOPE_ALTERNATIVES
+
+
+class TestCheckpointGating:
+    def test_local_path_not_gated(self, clean_env, tmp_path):
+        assert is_checkpoint_gated(str(tmp_path), "huggingface") is False
+
+    @pytest.fixture
+    def uncached(self, monkeypatch):
+        """Make the local HF cache lookup report a cache miss."""
+        monkeypatch.setattr(
+            "huggingface_hub.try_to_load_from_cache", lambda repo, filename: None
+        )
+
+    def test_hf_gated(self, clean_env, uncached, monkeypatch):
+        monkeypatch.setattr(
+            "huggingface_hub.model_info",
+            lambda repo, timeout=None: types.SimpleNamespace(gated="manual"),
+        )
+        assert is_checkpoint_gated("some/gated-model", "huggingface") is True
+
+    def test_hf_ungated(self, clean_env, uncached, monkeypatch):
+        monkeypatch.setattr(
+            "huggingface_hub.model_info",
+            lambda repo, timeout=None: types.SimpleNamespace(gated=False),
+        )
+        assert is_checkpoint_gated("some/open-model", "huggingface") is False
+
+    def test_hf_api_error_fails_open(self, clean_env, uncached, monkeypatch):
+        def failing_info(repo, timeout=None):
+            raise Exception("offline")
+
+        monkeypatch.setattr("huggingface_hub.model_info", failing_info)
+        assert is_checkpoint_gated("some/unknown-model", "huggingface") is False
+
+    def test_hf_api_called_with_timeout(self, clean_env, uncached, monkeypatch):
+        captured = {}
+
+        def capturing_info(repo, timeout=None):
+            captured["timeout"] = timeout
+            return types.SimpleNamespace(gated=False)
+
+        monkeypatch.setattr("huggingface_hub.model_info", capturing_info)
+        is_checkpoint_gated("some/open-model", "huggingface")
+        assert captured["timeout"] is not None and captured["timeout"] > 0
+
+    def test_hf_cached_checkpoint_skips_hub_query(self, clean_env, monkeypatch):
+        monkeypatch.setattr(
+            "huggingface_hub.try_to_load_from_cache",
+            lambda repo, filename: "/fake/cache/config.json",
+        )
+
+        def failing_info(repo, timeout=None):
+            raise AssertionError("hub API must not be queried for cached checkpoints")
+
+        monkeypatch.setattr("huggingface_hub.model_info", failing_info)
+        assert is_checkpoint_gated("some/gated-model", "huggingface") is False
+
+    def test_modelscope_restricted(self, clean_env, monkeypatch):
+        monkeypatch.setattr(
+            "requests.get",
+            lambda url, timeout=None: types.SimpleNamespace(
+                json=lambda: {"Data": {"Visibility": 1}}
+            ),
+        )
+        assert is_checkpoint_gated("some/restricted-model", "modelscope") is True
+
+    def test_modelscope_public(self, clean_env, monkeypatch):
+        monkeypatch.setattr(
+            "requests.get",
+            lambda url, timeout=None: types.SimpleNamespace(
+                json=lambda: {"Data": {"Visibility": 5}}
+            ),
+        )
+        assert is_checkpoint_gated("some/public-model", "modelscope") is False
+
+    def test_modelscope_api_error_fails_open(self, clean_env, monkeypatch):
+        def failing_get(url, timeout=None):
+            raise Exception("offline")
+
+        monkeypatch.setattr("requests.get", failing_get)
+        assert is_checkpoint_gated("some/unknown-model", "modelscope") is False
+
+
+class TestGatedPreflight:
+    def test_gated_hf_without_credentials_raises(self, clean_env, monkeypatch):
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        monkeypatch.setattr("huggingface_hub.get_token", lambda: None)
+        monkeypatch.setattr("roboml.utils.is_checkpoint_gated", lambda *a, **k: True)
+        with pytest.raises(RuntimeError, match="HF_TOKEN"):
+            resolve_checkpoint("BAAI/RoboBrain2.0-3B", "huggingface")
+
+    def test_gated_hf_with_credentials_passes(self, clean_env, monkeypatch):
+        monkeypatch.setenv("HF_TOKEN", "some-token")
+        monkeypatch.setattr("roboml.utils.is_checkpoint_gated", lambda *a, **k: True)
+        result = resolve_checkpoint("BAAI/RoboBrain2.0-3B", "huggingface")
+        assert result == "BAAI/RoboBrain2.0-3B"
+
+    def test_ungated_hf_skips_credential_check(self, clean_env, monkeypatch):
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        monkeypatch.setattr("huggingface_hub.get_token", lambda: None)
+        monkeypatch.setattr("roboml.utils.is_checkpoint_gated", lambda *a, **k: False)
+        result = resolve_checkpoint("BAAI/RoboBrain2.5-4B", "huggingface")
+        assert result == "BAAI/RoboBrain2.5-4B"
+
+    def test_gated_modelscope_without_credentials_raises(
+        self, clean_env, monkeypatch, fake_modelscope
+    ):
+        monkeypatch.delenv("MODELSCOPE_API_TOKEN", raising=False)
+        _fake_hub_config(monkeypatch, token=None)
+        monkeypatch.setattr("roboml.utils.is_checkpoint_gated", lambda *a, **k: True)
+        with pytest.raises(RuntimeError, match="MODELSCOPE_API_TOKEN"):
+            resolve_checkpoint("BAAI/RoboBrain2.0-3B", "modelscope")
+
+    def test_gated_modelscope_with_credentials_downloads(
+        self, clean_env, monkeypatch, fake_modelscope
+    ):
+        monkeypatch.setenv("MODELSCOPE_API_TOKEN", "some-token")
+        monkeypatch.setattr("roboml.utils.is_checkpoint_gated", lambda *a, **k: True)
+        result = resolve_checkpoint("BAAI/RoboBrain2.0-3B", "modelscope")
+        assert result == "/fake/cache/BAAI/RoboBrain2.0-3B"
 
 
 class TestHuggingFaceCredentials:
@@ -146,17 +277,6 @@ class TestHuggingFaceCredentials:
         monkeypatch.delenv("HF_TOKEN", raising=False)
         monkeypatch.setitem(sys.modules, "huggingface_hub", None)
         assert has_huggingface_credentials() is True
-
-    def test_robobrain_raises_without_credentials(self, monkeypatch):
-        import logging
-
-        from roboml.models import RoboBrain2
-
-        monkeypatch.delenv("HF_TOKEN", raising=False)
-        monkeypatch.setattr("huggingface_hub.get_token", lambda: None)
-        model = RoboBrain2(logger=logging.getLogger("test"))
-        with pytest.raises(ValueError, match="HF_TOKEN"):
-            model._initialize(source="huggingface")
 
 
 class TestModelScopeCredentials:
@@ -180,17 +300,6 @@ class TestModelScopeCredentials:
         monkeypatch.setitem(sys.modules, "modelscope_hub", None)
         monkeypatch.setitem(sys.modules, "modelscope_hub.config", None)
         assert has_modelscope_credentials() is True
-
-    def test_robobrain_raises_without_credentials(self, monkeypatch):
-        import logging
-
-        from roboml.models import RoboBrain2
-
-        monkeypatch.delenv("MODELSCOPE_API_TOKEN", raising=False)
-        _fake_hub_config(monkeypatch, token=None)
-        model = RoboBrain2(logger=logging.getLogger("test"))
-        with pytest.raises(ValueError, match="MODELSCOPE_API_TOKEN"):
-            model._initialize(source="modelscope")
 
 
 class TestWhisperAliasMapping:
@@ -221,7 +330,7 @@ class TestModelInitSignatures:
             models.VisionModel,
         ):
             params = inspect.signature(model_cls._initialize).parameters
-            assert "source" in params, (
-                f"{model_cls.__name__}._initialize is missing the source param"
-            )
+            assert (
+                "source" in params
+            ), f"{model_cls.__name__}._initialize is missing the source param"
             assert params["source"].default is None

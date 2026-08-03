@@ -170,6 +170,108 @@ def has_modelscope_credentials() -> bool:
         return True
 
 
+# ModelScope model visibility value for publicly downloadable models
+_MODELSCOPE_PUBLIC_VISIBILITY = 5
+
+# Timeout in seconds for hub API requests made during gating pre-flight
+_HUB_REQUEST_TIMEOUT = 10
+
+
+def _get_modelscope_endpoint() -> str:
+    """Get the ModelScope API endpoint from the SDK config if available.
+
+    :rtype: str
+    """
+    try:
+        from modelscope_hub.config import HubConfig
+
+        return HubConfig().endpoint
+    except Exception:
+        return "https://modelscope.cn"
+
+
+def is_checkpoint_gated(
+    checkpoint: str,
+    source: Optional[str] = None,
+    logger: logging.Logger = logger,
+) -> bool:
+    """Best-effort check of whether a checkpoint is gated/restricted on its hub.
+
+    Local paths and checkpoints already present in the local HuggingFace
+    cache are reported as not gated without querying the hub, since a
+    cached checkpoint implies a previously authorized download. Otherwise
+    the hub API is queried for the current gating status. Returns False
+    when the status cannot be determined leaving the decision to the download
+    attempt.
+
+    :param checkpoint:
+    :type checkpoint: str
+    :param source:
+    :type source: Optional[str]
+    :param logger:
+    :type logger: logging.Logger
+    :rtype: bool
+    """
+    if os.path.exists(checkpoint):
+        return False
+    source = get_checkpoint_source(source)
+    try:
+        if source == CheckpointSource.HUGGINGFACE.value:
+            from huggingface_hub import model_info, try_to_load_from_cache
+
+            if isinstance(try_to_load_from_cache(checkpoint, "config.json"), str):
+                return False
+            return bool(model_info(checkpoint, timeout=_HUB_REQUEST_TIMEOUT).gated)
+
+        import requests
+
+        response = requests.get(
+            f"{_get_modelscope_endpoint()}/api/v1/models/{checkpoint}",
+            timeout=_HUB_REQUEST_TIMEOUT,
+        )
+        data = response.json().get("Data") or {}
+        visibility = data.get("Visibility")
+        return visibility is not None and visibility != _MODELSCOPE_PUBLIC_VISIBILITY
+    except Exception as e:
+        logger.debug(f"Could not determine gating status for {checkpoint}: {e}")
+        return False
+
+
+def _check_gated_credentials(
+    checkpoint: str, source: str, logger: logging.Logger
+) -> None:
+    """Raise if a checkpoint is gated on its hub and no credentials are available.
+
+    :param checkpoint:
+    :type checkpoint: str
+    :param source:
+    :type source: str
+    :param logger:
+    :type logger: logging.Logger
+    :rtype: None
+    """
+    if not is_checkpoint_gated(checkpoint, source, logger):
+        return
+    if source == CheckpointSource.HUGGINGFACE.value:
+        if has_huggingface_credentials():
+            return
+        raise RuntimeError(
+            f"Checkpoint {checkpoint} is gated on HuggingFace hub. To use it:\n\n"
+            f"  1. Request access on the model page: https://huggingface.co/{checkpoint}\n"
+            "  2. Set your auth token: export HF_TOKEN='your_token_from_huggingface'\n"
+            "     (or log in once with: huggingface-cli login)\n"
+        )
+    if has_modelscope_credentials():
+        return
+    raise RuntimeError(
+        f"Checkpoint {checkpoint} is restricted on ModelScope. To use it:\n\n"
+        "  1. Get an access token from your ModelScope account: "
+        "https://modelscope.cn/my/myaccesstoken\n"
+        "  2. Set the token: export MODELSCOPE_API_TOKEN='your_token_from_modelscope'\n"
+        "     (or log in once with: modelscope login)\n"
+    )
+
+
 def resolve_checkpoint(
     checkpoint: str,
     source: Optional[str] = None,
@@ -180,7 +282,8 @@ def resolve_checkpoint(
     For huggingface the checkpoint ID is passed through unchanged and
     downloading is left to the underlying library. For modelscope the
     checkpoint is downloaded with modelscope.snapshot_download and the
-    local directory is returned.
+    local directory is returned. On both hubs, gated/restricted checkpoints
+    are checked for available credentials before any download is attempted.
 
     :param checkpoint:
     :type checkpoint: str
@@ -190,7 +293,9 @@ def resolve_checkpoint(
     :type logger: logging.Logger
     :rtype: str
     """
-    if get_checkpoint_source(source) != CheckpointSource.MODELSCOPE.value:
+    source = get_checkpoint_source(source)
+    if source != CheckpointSource.MODELSCOPE.value:
+        _check_gated_credentials(checkpoint, source, logger)
         return checkpoint
 
     try:
@@ -201,6 +306,7 @@ def resolve_checkpoint(
             "Install it with: pip install roboml[modelscope]"
         ) from e
 
+    _check_gated_credentials(checkpoint, source, logger)
     logger.info(f"Downloading checkpoint {checkpoint} from ModelScope hub")
     try:
         checkpoint_dir = snapshot_download(checkpoint)

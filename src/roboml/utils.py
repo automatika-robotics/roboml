@@ -173,6 +173,9 @@ def has_modelscope_credentials() -> bool:
 # ModelScope model visibility value for publicly downloadable models
 _MODELSCOPE_PUBLIC_VISIBILITY = 5
 
+# Timeout in seconds for hub API requests made during gating pre-flight
+_HUB_REQUEST_TIMEOUT = 10
+
 
 def _get_modelscope_endpoint() -> str:
     """Get the ModelScope API endpoint from the SDK config if available.
@@ -194,7 +197,10 @@ def is_checkpoint_gated(
 ) -> bool:
     """Best-effort check of whether a checkpoint is gated/restricted on its hub.
 
-    Queries the hub API for the current gating status. Returns False
+    Local paths and checkpoints already present in the local HuggingFace
+    cache are reported as not gated without querying the hub, since a
+    cached checkpoint implies a previously authorized download. Otherwise
+    the hub API is queried for the current gating status. Returns False
     when the status cannot be determined leaving the decision to the download
     attempt.
 
@@ -211,14 +217,17 @@ def is_checkpoint_gated(
     source = get_checkpoint_source(source)
     try:
         if source == CheckpointSource.HUGGINGFACE.value:
-            from huggingface_hub import model_info
+            from huggingface_hub import model_info, try_to_load_from_cache
 
-            return bool(model_info(checkpoint).gated)
+            if isinstance(try_to_load_from_cache(checkpoint, "config.json"), str):
+                return False
+            return bool(model_info(checkpoint, timeout=_HUB_REQUEST_TIMEOUT).gated)
 
         import requests
 
         response = requests.get(
-            f"{_get_modelscope_endpoint()}/api/v1/models/{checkpoint}", timeout=10
+            f"{_get_modelscope_endpoint()}/api/v1/models/{checkpoint}",
+            timeout=_HUB_REQUEST_TIMEOUT,
         )
         data = response.json().get("Data") or {}
         visibility = data.get("Visibility")

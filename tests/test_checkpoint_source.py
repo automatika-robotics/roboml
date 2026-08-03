@@ -142,26 +142,56 @@ class TestCheckpointGating:
     def test_local_path_not_gated(self, clean_env, tmp_path):
         assert is_checkpoint_gated(str(tmp_path), "huggingface") is False
 
-    def test_hf_gated(self, clean_env, monkeypatch):
+    @pytest.fixture
+    def uncached(self, monkeypatch):
+        """Make the local HF cache lookup report a cache miss."""
+        monkeypatch.setattr(
+            "huggingface_hub.try_to_load_from_cache", lambda repo, filename: None
+        )
+
+    def test_hf_gated(self, clean_env, uncached, monkeypatch):
         monkeypatch.setattr(
             "huggingface_hub.model_info",
-            lambda repo: types.SimpleNamespace(gated="manual"),
+            lambda repo, timeout=None: types.SimpleNamespace(gated="manual"),
         )
         assert is_checkpoint_gated("some/gated-model", "huggingface") is True
 
-    def test_hf_ungated(self, clean_env, monkeypatch):
+    def test_hf_ungated(self, clean_env, uncached, monkeypatch):
         monkeypatch.setattr(
             "huggingface_hub.model_info",
-            lambda repo: types.SimpleNamespace(gated=False),
+            lambda repo, timeout=None: types.SimpleNamespace(gated=False),
         )
         assert is_checkpoint_gated("some/open-model", "huggingface") is False
 
-    def test_hf_api_error_fails_open(self, clean_env, monkeypatch):
-        def failing_info(repo):
+    def test_hf_api_error_fails_open(self, clean_env, uncached, monkeypatch):
+        def failing_info(repo, timeout=None):
             raise Exception("offline")
 
         monkeypatch.setattr("huggingface_hub.model_info", failing_info)
         assert is_checkpoint_gated("some/unknown-model", "huggingface") is False
+
+    def test_hf_api_called_with_timeout(self, clean_env, uncached, monkeypatch):
+        captured = {}
+
+        def capturing_info(repo, timeout=None):
+            captured["timeout"] = timeout
+            return types.SimpleNamespace(gated=False)
+
+        monkeypatch.setattr("huggingface_hub.model_info", capturing_info)
+        is_checkpoint_gated("some/open-model", "huggingface")
+        assert captured["timeout"] is not None and captured["timeout"] > 0
+
+    def test_hf_cached_checkpoint_skips_hub_query(self, clean_env, monkeypatch):
+        monkeypatch.setattr(
+            "huggingface_hub.try_to_load_from_cache",
+            lambda repo, filename: "/fake/cache/config.json",
+        )
+
+        def failing_info(repo, timeout=None):
+            raise AssertionError("hub API must not be queried for cached checkpoints")
+
+        monkeypatch.setattr("huggingface_hub.model_info", failing_info)
+        assert is_checkpoint_gated("some/gated-model", "huggingface") is False
 
     def test_modelscope_restricted(self, clean_env, monkeypatch):
         monkeypatch.setattr(
@@ -300,7 +330,7 @@ class TestModelInitSignatures:
             models.VisionModel,
         ):
             params = inspect.signature(model_cls._initialize).parameters
-            assert "source" in params, (
-                f"{model_cls.__name__}._initialize is missing the source param"
-            )
+            assert (
+                "source" in params
+            ), f"{model_cls.__name__}._initialize is missing the source param"
             assert params["source"].default is None

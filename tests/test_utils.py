@@ -181,6 +181,40 @@ class TestVideoProcessing:
         assert metadata[0]["fps"] == pytest.approx(2.0)
         assert metadata[0]["duration"] == pytest.approx(3.0)
 
+    def test_max_video_frames_applied_during_decode(self, sample_mp4_bytes):
+        frames_list, metadata = pre_process_videos(
+            [sample_mp4_bytes], max_video_frames=6
+        )
+        assert frames_list[0].shape == (6, 64, 64, 3)
+        assert metadata is not None
+        assert metadata[0]["total_num_frames"] == 6
+        # fps is scaled down so that duration stays consistent
+        assert metadata[0]["fps"] == pytest.approx(2.0)
+        assert metadata[0]["duration"] == pytest.approx(3.0)
+
+    def test_max_video_frames_without_container_index(self, sample_frames):
+        """Containers without a frame-count index (e.g. mpegts) must still
+        be capped via the duration estimate or the counting fallback."""
+        from io import BytesIO
+
+        import av
+
+        buf = BytesIO()
+        with av.open(buf, mode="w", format="mpegts") as container:
+            stream = container.add_stream("mpeg4", rate=4)
+            stream.width = 64
+            stream.height = 64
+            stream.pix_fmt = "yuv420p"
+            for arr in sample_frames:
+                frame = av.VideoFrame.from_ndarray(arr, format="rgb24")
+                for packet in stream.encode(frame):
+                    container.mux(packet)
+            for packet in stream.encode():
+                container.mux(packet)
+
+        frames_list, _ = pre_process_videos([buf.getvalue()], max_video_frames=6)
+        assert 1 <= frames_list[0].shape[0] <= 6
+
     def test_invalid_video_bytes_rejected(self):
         # PyAV raises FFmpegError (an OSError subclass) on undecodable bytes
         with pytest.raises((ValueError, OSError)):

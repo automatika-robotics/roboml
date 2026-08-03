@@ -77,12 +77,48 @@ def pre_process_images_to_np(
     return [np.array(PILImage.open(BytesIO(base64.b64decode(img)))) for img in data]
 
 
-def _decode_video(data: bytes) -> tuple[np.ndarray, Optional[float]]:
+def _total_video_frames(container, stream, fps: Optional[float]) -> int:
+    """Get the total frame count of a video stream without decoding it.
+
+    Uses the container index when present, otherwise estimates from the
+    stream or container duration. Returns 0 when neither is available.
+
+    :param container:
+    :param stream:
+    :param fps:
+    :type fps: Optional[float]
+    :rtype: int
+    """
+    import av
+
+    if stream.frames:
+        return stream.frames
+    if not fps:
+        return 0
+    if stream.duration and stream.time_base:
+        return round(float(stream.duration * stream.time_base) * fps)
+    if container.duration:
+        return round(container.duration / av.time_base * fps)
+    return 0
+
+
+def _decode_video(
+    data: bytes, max_video_frames: Optional[int] = None
+) -> tuple[np.ndarray, Optional[float]]:
     """Decode an encoded video (e.g. mp4) into an array of RGB frames.
+
+    When max_video_frames is set, frames are subsampled uniformly during
+    the decode loop so that peak memory stays bounded by max_video_frames
+    regardless of clip length. For containers that report neither a frame
+    count nor a duration, the frames are counted with a discarding decode
+    pass first. The returned frame rate is scaled to the kept frames so
+    the clip duration stays consistent.
 
     :param data: encoded video bytes
     :type data: bytes
-    :returns: frames in (T, H, W, C) layout and the container frame rate
+    :param max_video_frames: maximum number of frames to keep
+    :type max_video_frames: Optional[int]
+    :returns: frames in (T, H, W, C) layout and their effective frame rate
     :rtype: tuple[np.ndarray, Optional[float]]
     """
     import av
@@ -90,11 +126,30 @@ def _decode_video(data: bytes) -> tuple[np.ndarray, Optional[float]]:
     with av.open(BytesIO(data)) as container:
         stream = container.streams.video[0]
         fps = float(stream.average_rate) if stream.average_rate else None
+        total = _total_video_frames(container, stream, fps)
+        if max_video_frames and not total:
+            # no usable metadata: count frames in a discarding pass so that
+            # the decode below stays memory bounded
+            total = sum(1 for _ in container.decode(stream))
+
+    keep = None
+    if max_video_frames and total > max_video_frames:
+        keep = set(
+            np.linspace(0, total - 1, max_video_frames).round().astype(int).tolist()
+        )
+
+    with av.open(BytesIO(data)) as container:
+        stream = container.streams.video[0]
         frames = [
-            frame.to_ndarray(format="rgb24") for frame in container.decode(stream)
+            frame.to_ndarray(format="rgb24")
+            for i, frame in enumerate(container.decode(stream))
+            if keep is None or i in keep
         ]
     if not frames:
         raise ValueError("Could not decode any frames from the provided video")
+    if keep is not None and fps:
+        # keep duration consistent with the reduced frame count
+        fps = fps * len(frames) / total
     return np.stack(frames), fps
 
 
@@ -128,19 +183,22 @@ def pre_process_videos(
         if isinstance(video, str):
             video = base64.b64decode(video)
         if isinstance(video, bytes):
-            frames, fps = _decode_video(video)
+            # subsampling is applied during decode so that peak memory is
+            # bounded by max_video_frames rather than the clip length
+            frames, fps = _decode_video(video, max_video_frames)
         else:
             frames, fps = np.asarray(video), video_fps
-
-        total_frames = len(frames)
-        if max_video_frames and total_frames > max_video_frames:
-            indices = (
-                np.linspace(0, total_frames - 1, max_video_frames).round().astype(int)
-            )
-            frames = frames[indices]
-            if fps:
-                # keep duration consistent with the reduced frame count
-                fps = fps * max_video_frames / total_frames
+            total_frames = len(frames)
+            if max_video_frames and total_frames > max_video_frames:
+                indices = (
+                    np.linspace(0, total_frames - 1, max_video_frames)
+                    .round()
+                    .astype(int)
+                )
+                frames = frames[indices]
+                if fps:
+                    # keep duration consistent with the reduced frame count
+                    fps = fps * max_video_frames / total_frames
 
         if fps:
             metadata.append({

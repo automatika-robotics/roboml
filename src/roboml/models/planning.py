@@ -212,6 +212,12 @@ class RoboBrain2(ModelTemplate):
         # Thinking mode is only supported by RoboBrain 2.0 models of 7B+
         self.supports_thinking = _supports_thinking(self.family, checkpoint)
         self.logger.info(f"Loaded {self.family} model from {checkpoint}")
+        if not self.supports_thinking:
+            self.logger.info(
+                "Thinking mode is not supported by this checkpoint: the "
+                "enable_thinking inference option will be ignored and "
+                "'thinking' in the response will always be empty."
+            )
 
     def _inference(self, data: PlanningInput) -> dict:
         """Model inference.

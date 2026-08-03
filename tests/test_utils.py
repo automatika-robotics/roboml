@@ -149,6 +149,7 @@ class TestVideoProcessing:
         assert metadata[0]["fps"] == 4.0
         assert metadata[0]["total_num_frames"] == 12
         assert metadata[0]["duration"] == pytest.approx(3.0)
+        assert metadata[0]["frames_indices"] == list(range(12))
 
     def test_from_ndarray_without_fps(self, sample_frames):
         frames_list, metadata = pre_process_videos([sample_frames])
@@ -180,6 +181,8 @@ class TestVideoProcessing:
         # fps is scaled down so that duration stays consistent
         assert metadata[0]["fps"] == pytest.approx(2.0)
         assert metadata[0]["duration"] == pytest.approx(3.0)
+        # indices refer to the kept frames at the effective fps
+        assert metadata[0]["frames_indices"] == list(range(6))
 
     def test_max_video_frames_applied_during_decode(self, sample_mp4_bytes):
         frames_list, metadata = pre_process_videos(
@@ -191,6 +194,7 @@ class TestVideoProcessing:
         # fps is scaled down so that duration stays consistent
         assert metadata[0]["fps"] == pytest.approx(2.0)
         assert metadata[0]["duration"] == pytest.approx(3.0)
+        assert metadata[0]["frames_indices"] == list(range(6))
 
     def test_max_video_frames_without_container_index(self, sample_frames):
         """Containers without a frame-count index (e.g. mpegts) must still

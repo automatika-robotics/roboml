@@ -205,6 +205,8 @@ def pre_process_videos(
                 "fps": fps,
                 "total_num_frames": len(frames),
                 "duration": len(frames) / fps,
+                # indices of the kept frames at the effective fps
+                "frames_indices": list(range(len(frames))),
             })
         else:
             fps_known = False

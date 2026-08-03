@@ -14,6 +14,25 @@ from scipy.io.wavfile import write
 
 logger = logging.getLogger("roboml")
 
+# --- Checkpoint hub constants ---
+
+# First-party ModelScope alternatives for default checkpoints
+# that are only available on HuggingFace Hub
+MODELSCOPE_ALTERNATIVES = {
+    "suno/bark-small": "microsoft/speecht5_tts",
+    "suno/bark": "microsoft/speecht5_tts",
+    "PekingU/rtdetr_r50vd_coco_o365": "facebook/detr-resnet-50",
+}
+
+# ModelScope model visibility value for publicly downloadable models
+_MODELSCOPE_PUBLIC_VISIBILITY = 5
+
+# ModelScope API endpoint used when the SDK config is unavailable
+_MODELSCOPE_FALLBACK_ENDPOINT = "https://modelscope.cn"
+
+# Timeout in seconds for hub API requests made during gating pre-flight
+_HUB_REQUEST_TIMEOUT = 10
+
 
 def pre_process_images_to_pil(
     data: Union[list[str], list[np.ndarray]],
@@ -180,15 +199,6 @@ class CheckpointSource(Enum):
     MODELSCOPE = "modelscope"
 
 
-# First-party ModelScope alternatives for default checkpoints
-# that are only available on HuggingFace Hub
-MODELSCOPE_ALTERNATIVES = {
-    "suno/bark-small": "microsoft/speecht5_tts",
-    "suno/bark": "microsoft/speecht5_tts",
-    "PekingU/rtdetr_r50vd_coco_o365": "facebook/detr-resnet-50",
-}
-
-
 def get_checkpoint_source(source: Optional[str] = None) -> str:
     """Get the effective checkpoint source.
 
@@ -249,13 +259,6 @@ def has_modelscope_credentials() -> bool:
         return True
 
 
-# ModelScope model visibility value for publicly downloadable models
-_MODELSCOPE_PUBLIC_VISIBILITY = 5
-
-# Timeout in seconds for hub API requests made during gating pre-flight
-_HUB_REQUEST_TIMEOUT = 10
-
-
 def _get_modelscope_endpoint() -> str:
     """Get the ModelScope API endpoint from the SDK config if available.
 
@@ -266,7 +269,7 @@ def _get_modelscope_endpoint() -> str:
 
         return HubConfig().endpoint
     except Exception:
-        return "https://modelscope.cn"
+        return _MODELSCOPE_FALLBACK_ENDPOINT
 
 
 def is_checkpoint_gated(

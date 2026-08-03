@@ -16,10 +16,9 @@ from starlette.responses import StreamingResponse
 import inspect
 
 from . import app, ingress_decorator
+from roboml.chat import is_chat_compatible, translate_chat_request
 from roboml.models import ModelTemplate
 from roboml.interfaces import (
-    LLMInput,
-    VLLMInput,
     ChatCompletionRequest,
     ChatCompletionResponse,
     ChatCompletionChoice,
@@ -35,9 +34,6 @@ m_pack.patch()
 
 # Define a constant for the chunk size (1MB)
 CHUNK_SIZE = 1 * 1024 * 1024
-
-# Model types that support chat completions
-CHAT_COMPATIBLE_INPUTS = (LLMInput, VLLMInput)
 
 
 @ingress_decorator
@@ -119,7 +115,7 @@ class RayNode:
         if self.model.status is not Status.READY:
             raise HTTPException(status_code=500, detail="Model not initialized")
 
-        if not issubclass(self.data_model, CHAT_COMPATIBLE_INPUTS):
+        if not is_chat_compatible(self.data_model):
             raise HTTPException(
                 status_code=400,
                 detail="This model does not support chat completions. "
@@ -133,7 +129,7 @@ class RayNode:
 
         # Translate OpenAI format to internal format
         try:
-            internal_input = self._translate_chat_request(request)
+            internal_input = translate_chat_request(request, self.data_model)
             result = self.model._inference(internal_input)
         except ValidationError as e:
             raise HTTPException(status_code=400, detail=e.errors()) from e
@@ -160,46 +156,6 @@ class RayNode:
             content=response.model_dump_json(),
             media_type="application/json",
         )
-
-    def _translate_chat_request(self, request: ChatCompletionRequest) -> BaseModel:
-        """Translate OpenAI ChatCompletionRequest to internal LLMInput or VLLMInput."""
-        images = []
-        query = []
-
-        for msg in request.messages:
-            content = msg.get("content", "")
-
-            # Handle multimodal content (list of content parts)
-            if isinstance(content, list):
-                text_parts = []
-                for part in content:
-                    if part.get("type") == "text":
-                        text_parts.append(part.get("text", ""))
-                    elif part.get("type") == "image_url":
-                        url = part.get("image_url", {}).get("url", "")
-                        # Strip data URI prefix if present
-                        if url.startswith("data:"):
-                            url = url.split(",", 1)[-1]
-                        images.append(url)
-                query.append({
-                    "role": msg.get("role", "user"),
-                    "content": " ".join(text_parts),
-                })
-            else:
-                query.append({"role": msg.get("role", "user"), "content": content})
-
-        kwargs = {
-            "query": query,
-            "max_new_tokens": request.max_tokens,
-            "temperature": request.temperature,
-            "stream": request.stream,
-        }
-
-        if images and issubclass(self.data_model, VLLMInput):
-            kwargs["images"] = images
-            return VLLMInput(**kwargs)
-
-        return LLMInput(**kwargs)
 
     async def _stream_chat_response(self, generator: AsyncGenerator):
         """Wrap streaming tokens in OpenAI SSE format."""

@@ -101,12 +101,17 @@ class TransformersLLM(ModelTemplate):
         temperature: float,
         streamer: Optional[TextIteratorStreamer],
         images: Optional[list[Image]] = None,
+        videos: Optional[list] = None,
+        video_metadata: Optional[list[dict]] = None,
     ):
-        input = (
-            self.pre_processor(text=text, return_tensors="pt")
-            if not images
-            else self.pre_processor(text=text, images=images, return_tensors="pt")
-        ).to(self.device)
+        proc_kwargs = {"text": text, "return_tensors": "pt"}
+        if images:
+            proc_kwargs["images"] = images
+        if videos:
+            proc_kwargs["videos"] = videos
+            if video_metadata:
+                proc_kwargs["video_metadata"] = video_metadata
+        input = self.pre_processor(**proc_kwargs).to(self.device)
         # input_ids = input.input_ids.to(self.device)
         with torch.no_grad():
             generated_ids = self.model.generate(

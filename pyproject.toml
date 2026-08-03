@@ -41,7 +41,8 @@ dependencies = [
     "packaging",
     "ctranslate2",
     "faster-whisper",
-    "trackers"
+    "trackers",
+    "av"  # used for video decoding
 ]
 
 requires-python = ">=3.10"

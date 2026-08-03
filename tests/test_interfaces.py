@@ -133,6 +133,28 @@ def test_vllm_input_images_and_videos():
     assert len(data.videos) == 1
 
 
+def test_vllm_input_single_frame_video_rejected():
+    """Test that a bare (H, W, C) image passed as a video is rejected."""
+    from roboml.interfaces import VLLMInput
+
+    image = np.zeros((480, 640, 3), dtype=np.uint8)
+    with pytest.raises(ValidationError, match=r"\(T, H, W, C\)"):
+        VLLMInput(
+            query=[{"role": "user", "content": "Describe"}],
+            videos=[image],
+            video_fps=4.0,
+        )
+
+
+def test_vllm_input_non_rgb_video_rejected():
+    """Test that frame stacks without 3 channels are rejected."""
+    from roboml.interfaces import VLLMInput
+
+    rgba = np.zeros((8, 64, 64, 4), dtype=np.uint8)
+    with pytest.raises(ValidationError, match="C=3"):
+        VLLMInput(query=[{"role": "user", "content": "Describe"}], videos=[rgba])
+
+
 def test_vllm_input_no_visual_input_rejected():
     """Test that VLLMInput rejects requests without images or videos."""
     from roboml.interfaces import VLLMInput

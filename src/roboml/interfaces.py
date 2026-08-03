@@ -86,6 +86,16 @@ class VLLMInput(LLMInput):
     def validate_visual_input(self) -> "VLLMInput":
         if not self.images and not self.videos:
             raise ValueError("At least one image or video must be provided.")
+        for idx, video in enumerate(self.videos):
+            if isinstance(video, np.ndarray) and (
+                video.ndim != 4 or video.shape[-1] != 3
+            ):
+                raise ValueError(
+                    f"Video at index {idx} has shape {video.shape}. Videos given "
+                    "as numpy arrays must be RGB frame stacks in (T, H, W, C) "
+                    "layout with C=3. To send a single frame, use the images "
+                    "field or a stack of length one."
+                )
         return self
 
 

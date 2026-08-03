@@ -97,6 +97,34 @@ class TestOutputExtraction:
         )
         assert out == [[(10, 20, 0.5), (30, 40, 0.75)]]
 
+    def test_trajectory_integer_depth_in_robobrain25(self):
+        # regression: integer depths must not be silently dropped
+        out = _extract_structured_output(
+            "[(100, 200, 1), (300, 400, 2)]", "trajectory", FAMILY_ROBOBRAIN25
+        )
+        assert out == [[(100, 200, 1.0), (300, 400, 2.0)]]
+
+    def test_trajectory_mixed_depth_in_robobrain25(self):
+        # regression: mixed integer/decimal depths must not truncate the
+        # trajectory
+        out = _extract_structured_output(
+            "[(100, 200, 1), (300, 400, 2.0)]", "trajectory", FAMILY_ROBOBRAIN25
+        )
+        assert out == [[(100, 200, 1.0), (300, 400, 2.0)]]
+
+    def test_trajectory_bracket_tuples_in_robobrain25(self):
+        out = _extract_structured_output(
+            "[[10, 20, 0.5], [30, 40, 2]]", "trajectory", FAMILY_ROBOBRAIN25
+        )
+        assert out == [[(10, 20, 0.5), (30, 40, 2.0)]]
+
+    def test_trajectory_ignores_box_style_output_in_robobrain25(self):
+        # a grounding-style box must not be misread as a single 3D waypoint
+        out = _extract_structured_output(
+            "[100, 200, 300, 400]", "trajectory", FAMILY_ROBOBRAIN25
+        )
+        assert out == [[]]
+
     def test_trajectory_2d_in_robobrain20(self):
         out = _extract_structured_output(
             "[[10, 20], [30, 40]]", "trajectory", FAMILY_ROBOBRAIN20

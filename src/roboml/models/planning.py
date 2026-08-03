@@ -128,8 +128,13 @@ def _extract_structured_output(answer_text: str, task: str, family: str) -> str 
     try:
         if task == "trajectory":
             if family == FAMILY_ROBOBRAIN25:
-                # RoboBrain 2.5 predicts 3D waypoints with depth
-                trajectory_pattern = r"(\d+),\s*(\d+),\s*([+-]?\d+\.\d+)"
+                # NOTE: RoboBrain 2.5 predicts 3D waypoints with depth.
+                # Depth may be integer or decimal; match whole delimited
+                # tuples only, so box-style outputs like [x1, y1, x2, y2]
+                # are not misread
+                trajectory_pattern = (
+                    r"[(\[]\s*(\d+)\s*,\s*(\d+)\s*,\s*([+-]?\d+(?:\.\d+)?)\s*[)\]]"
+                )
                 points = re.findall(trajectory_pattern, answer_text)
                 return [[(int(x), int(y), float(d)) for x, y, d in points]]
             trajectory_pattern = r"(\d+),\s*(\d+)"
@@ -267,6 +272,14 @@ class RoboBrain2(ModelTemplate):
             answer_text = generated_text.strip()
 
         answer = _extract_structured_output(answer_text, data.task, self.family)
+
+        if data.task != "general" and (
+            isinstance(answer, str) or not answer or answer == [[]]
+        ):
+            self.logger.warning(
+                f"No structured output could be parsed for task '{data.task}' "
+                f"from model answer: {answer_text!r}"
+            )
 
         return {"output": answer, "thinking": thinking_text}
 

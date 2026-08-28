@@ -155,6 +155,73 @@ def _extract_structured_output(answer_text: str, task: str, family: str) -> str 
         return "Error occured while extracting structured output"
 
 
+# Side of the box synthesized around a RoboBrain 2.5 affordance point, as a
+# fraction of the image's shorter side.
+_AFFORDANCE_BOX_FRACTION = 0.05
+
+
+def _clamp(value: int, size: int) -> int:
+    """Keep a pixel coordinate inside an image dimension."""
+    return min(max(value, 0), size - 1)
+
+
+def _normalize_output(
+    answer: str | list, task: str, family: str, image_size: tuple[int, int] | None
+) -> tuple[str | list, dict]:
+    """Standardize outputs for both 2.0 and 2.5.
+
+    :param answer: Output of :func:`_extract_structured_output`
+    :type answer: str | list
+    :param task:
+    :type task: str
+    :param family:
+    :type family: str
+    :param image_size: (width, height) of the image the model saw, None
+        when unknown (nothing is rescaled then)
+    :type image_size: tuple[int, int] | None
+    :returns: (normalized output, extra response fields)
+    :rtype: tuple[str | list, dict]
+    """
+    extras: dict = {}
+    if (
+        family != FAMILY_ROBOBRAIN25
+        or image_size is None
+        or isinstance(answer, str)
+        or not answer
+    ):
+        return answer, extras
+    width, height = image_size
+
+    def pixel(x: int | float, y: int | float) -> tuple[int, int]:
+        return (
+            _clamp(round(x / 1000.0 * width), width),
+            _clamp(round(y / 1000.0 * height), height),
+        )
+
+    if task == "trajectory":
+        # [[(x, y, d), ...]] -> [[(x, y), ...]] with the depths kept seperate
+        extras["depths"] = [[d for _, _, d in trajectory] for trajectory in answer]
+        waypoints = [[pixel(x, y) for x, y, _ in trajectory] for trajectory in answer]
+        return waypoints, extras
+    if task == "pointing":
+        return [pixel(x, y) for x, y in answer], extras
+    if task == "affordance":
+        half = max(1, round(_AFFORDANCE_BOX_FRACTION * min(width, height) / 2))
+        boxes = []
+        for x, y in answer:
+            cx, cy = pixel(x, y)
+            boxes.append([
+                _clamp(cx - half, width),
+                _clamp(cy - half, height),
+                _clamp(cx + half, width),
+                _clamp(cy + half, height),
+            ])
+        return boxes, extras
+    if task == "grounding":
+        return [[*pixel(x1, y1), *pixel(x2, y2)] for x1, y1, x2, y2 in answer], extras
+    return answer, extras
+
+
 class RoboBrain2(ModelTemplate):
     """
         RoboBrain 2.0 / 2.5 by BAAI
@@ -190,9 +257,10 @@ class RoboBrain2(ModelTemplate):
         Supports both RoboBrain 2.0 and RoboBrain 2.5 checkpoints; the family
         is detected from the loaded model config.
 
-        RoboBrain 2.5 predicts 3D (x, y, depth) waypoints for the trajectory
-        task, returns points instead of boxes for the affordance task, and has
-        no thinking mode.
+        RoboBrain 2.5 predicts coordinates relative to a 0-1000 grid, 3D
+        (x, y, depth) waypoints for the trajectory task, a point instead of
+        a box for the affordance task, and has no thinking mode. Its outputs
+        are normalized to the 2.0 contract before they are returned.
 
         :param checkpoint:
         :type checkpoint: str
@@ -241,6 +309,7 @@ class RoboBrain2(ModelTemplate):
 
         # process images
         images = pre_process_images_to_pil(data.images)
+        image_size = images[0].size if data.task != "general" and images else None
 
         inputs = self.pre_processor(
             text=[text],
@@ -287,7 +356,8 @@ class RoboBrain2(ModelTemplate):
                 f"from model answer: {answer_text!r}"
             )
 
-        return {"output": answer, "thinking": thinking_text}
+        answer, extras = _normalize_output(answer, data.task, self.family, image_size)
+        return {"output": answer, "thinking": thinking_text, **extras}
 
     def __create_prompt(self, query: list[dict], task: str, num_images: int) -> list:
         """

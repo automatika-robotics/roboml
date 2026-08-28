@@ -7,6 +7,7 @@ import base64
 import logging
 import pytest
 import cv2
+import numpy as np
 
 from roboml.models import (
     TransformersLLM,
@@ -244,3 +245,73 @@ def test_planning(loaded_img):
     )
     assert "output" in result
     assert isinstance(result["output"], list)
+
+
+def _image_size(img_b64: str) -> tuple[int, int]:
+    """(width, height) of a base64 encoded image."""
+    img = cv2.imdecode(
+        np.frombuffer(base64.b64decode(img_b64), np.uint8), cv2.IMREAD_COLOR
+    )
+    return img.shape[1], img.shape[0]
+
+
+def _inside(width: int, height: int, *points) -> bool:
+    return all(0 <= x < width and 0 <= y < height for x, y in points)
+
+
+def test_planning_outputs_are_pixels_of_the_input_image(loaded_img):
+    """Whatever the RoboBrain family, structured outputs come back as pixel
+    coordinates of the input image (2.5 predicts on a 0-1000 grid), boxes
+    for grounding AND affordance, and 2D trajectory waypoints."""
+    width, height = _image_size(loaded_img)
+    query = {"role": "user", "content": "The sandwich"}
+
+    boxes = run_model(
+        RoboBrain2,
+        inputs=[PlanningInput(query=[query], task="grounding", images=[loaded_img])],
+        log_output=True,
+    )["output"]
+    assert boxes, "grounding found nothing on the test image"
+    for x1, y1, x2, y2 in boxes:
+        assert _inside(width, height, (x1, y1), (x2, y2)) and x1 <= x2 and y1 <= y2
+
+    affordance = run_model(
+        RoboBrain2,
+        inputs=[
+            PlanningInput(
+                query=[{"role": "user", "content": "Pick up the sandwich"}],
+                task="affordance",
+                images=[loaded_img],
+            )
+        ],
+        log_output=True,
+    )["output"]
+    assert affordance, "affordance found nothing on the test image"
+    for box in affordance:
+        assert len(box) == 4 and _inside(width, height, box[:2], box[2:])
+
+    points = run_model(
+        RoboBrain2,
+        inputs=[PlanningInput(query=[query], task="pointing", images=[loaded_img])],
+        log_output=True,
+    )["output"]
+    assert points and _inside(width, height, *points)
+
+    trajectory = run_model(
+        RoboBrain2,
+        inputs=[
+            PlanningInput(
+                query=[{"role": "user", "content": "Move to the glass"}],
+                task="trajectory",
+                images=[loaded_img],
+            )
+        ],
+        log_output=True,
+    )
+    (waypoints,) = trajectory["output"]
+    assert waypoints and all(len(p) == 2 for p in waypoints)
+    assert _inside(width, height, *waypoints)
+    # the 2.5 family predicts depth alongside; it travels separately
+    if "depths" in trajectory:
+        (depths,) = trajectory["depths"]
+        assert len(depths) == len(waypoints)

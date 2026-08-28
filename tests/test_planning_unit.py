@@ -8,6 +8,7 @@ from roboml.models.planning import (
     _build_task_text,
     _detect_family,
     _extract_structured_output,
+    _normalize_output,
     _supports_thinking,
 )
 
@@ -146,3 +147,75 @@ class TestOutputExtraction:
             assert _extract_structured_output("free text", "general", family) == (
                 "free text"
             )
+
+
+class TestOutputNormalization:
+    """RoboBrain 2.5 outputs are brought to the 2.0 contract: pixel
+    coordinates of the input image, boxes for affordance, 2D waypoints."""
+
+    SIZE = (640, 480)
+
+    def test_robobrain20_passes_through_untouched(self):
+        for task, raw in (
+            ("pointing", [(10, 20)]),
+            ("grounding", [[10, 20, 30, 40]]),
+            ("affordance", [[10, 20, 30, 40]]),
+            ("trajectory", [[(10, 20), (30, 40)]]),
+        ):
+            out, extras = _normalize_output(raw, task, FAMILY_ROBOBRAIN20, self.SIZE)
+            assert out == raw and extras == {}
+
+    def test_text_and_empty_outputs_pass_through(self):
+        assert _normalize_output(
+            "free text", "general", FAMILY_ROBOBRAIN25, self.SIZE
+        ) == ("free text", {})
+        assert _normalize_output([], "pointing", FAMILY_ROBOBRAIN25, self.SIZE) == (
+            [],
+            {},
+        )
+
+    def test_unknown_image_size_leaves_coordinates_alone(self):
+        out, _ = _normalize_output([(500, 500)], "pointing", FAMILY_ROBOBRAIN25, None)
+        assert out == [(500, 500)]
+
+    def test_robobrain25_points_become_pixels(self):
+        out, extras = _normalize_output(
+            [(500, 500), (0, 0)], "pointing", FAMILY_ROBOBRAIN25, self.SIZE
+        )
+        assert out == [(320, 240), (0, 0)] and extras == {}
+
+    def test_robobrain25_pixels_are_clamped_to_the_image(self):
+        out, _ = _normalize_output(
+            [(1000, 1000)], "pointing", FAMILY_ROBOBRAIN25, self.SIZE
+        )
+        assert out == [(639, 479)]
+
+    def test_robobrain25_boxes_become_pixels(self):
+        out, _ = _normalize_output(
+            [[250, 250, 750, 750]], "grounding", FAMILY_ROBOBRAIN25, self.SIZE
+        )
+        assert out == [[160, 120, 480, 360]]
+
+    def test_robobrain25_affordance_point_becomes_a_box_around_it(self):
+        out, _ = _normalize_output(
+            [(500, 500)], "affordance", FAMILY_ROBOBRAIN25, self.SIZE
+        )
+        # 5% of the shorter side (480) is 24 px: a 12 px half-side box
+        # centered on the pixel (320, 240)
+        assert out == [[308, 228, 332, 252]]
+
+    def test_robobrain25_affordance_box_stays_inside_the_image(self):
+        out, _ = _normalize_output(
+            [(0, 0)], "affordance", FAMILY_ROBOBRAIN25, self.SIZE
+        )
+        assert out == [[0, 0, 12, 12]]
+
+    def test_robobrain25_trajectory_is_2d_with_depths_apart(self):
+        out, extras = _normalize_output(
+            [[(500, 500, 0.5), (1000, 0, 2.0)]],
+            "trajectory",
+            FAMILY_ROBOBRAIN25,
+            self.SIZE,
+        )
+        assert out == [[(320, 240), (639, 0)]]
+        assert extras == {"depths": [[0.5, 2.0]]}

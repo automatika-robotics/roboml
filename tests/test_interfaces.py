@@ -174,6 +174,36 @@ def test_llm_input_default_max_new_tokens():
     assert data.max_new_tokens == 512
 
 
+def test_llm_input_non_positive_temperature_rejected():
+    """Test that temperature must be strictly positive (transformers raises
+    on temperature=0 with do_sample=True)."""
+    from roboml.interfaces import LLMInput
+
+    for temperature in (0, -0.5):
+        with pytest.raises(ValidationError):
+            LLMInput(
+                query=[{"role": "user", "content": "Hello"}], temperature=temperature
+            )
+
+
+def test_planning_input_max_new_tokens_default():
+    """Test that PlanningInput defaults to the official RoboBrain token
+    budget and that clients can override it."""
+    from roboml.interfaces import PlanningInput
+
+    data = PlanningInput(
+        query=[{"role": "user", "content": "Describe"}], images=["aGVsbG8="]
+    )
+    assert data.max_new_tokens == 768
+
+    data = PlanningInput(
+        query=[{"role": "user", "content": "Describe"}],
+        images=["aGVsbG8="],
+        max_new_tokens=2048,
+    )
+    assert data.max_new_tokens == 2048
+
+
 def test_planning_input_validation():
     """Test PlanningInput task validation."""
     from roboml.interfaces import PlanningInput

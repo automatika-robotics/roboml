@@ -210,6 +210,14 @@ class TestOutputNormalization:
         )
         assert out == [[0, 0, 12, 12]]
 
+    def test_failed_trajectory_parse_gains_no_depths(self):
+        # [[]] is what a failed trajectory extraction returns; it must not
+        # come back advertising an (empty) depths field
+        out, extras = _normalize_output(
+            [[]], "trajectory", FAMILY_ROBOBRAIN25, self.SIZE
+        )
+        assert out == [[]] and extras == {}
+
     def test_robobrain25_trajectory_is_2d_with_depths_apart(self):
         out, extras = _normalize_output(
             [[(500, 500, 0.5), (1000, 0, 2.0)]],

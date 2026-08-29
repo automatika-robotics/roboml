@@ -183,11 +183,13 @@ def _normalize_output(
     :rtype: tuple[str | list, dict]
     """
     extras: dict = {}
+    # answer == [[]] is a failed trajectory parse
     if (
         family != FAMILY_ROBOBRAIN25
         or image_size is None
         or isinstance(answer, str)
         or not answer
+        or answer == [[]]
     ):
         return answer, extras
     width, height = image_size
@@ -321,7 +323,10 @@ class RoboBrain2(ModelTemplate):
 
         # do inference
         generated_ids = self.model.generate(
-            **inputs, max_new_tokens=768, do_sample=True, temperature=data.temperature
+            **inputs,
+            max_new_tokens=data.max_new_tokens,
+            do_sample=True,
+            temperature=data.temperature,
         )
 
         generated_ids_trimmed = [

@@ -174,7 +174,7 @@ def test_tts_vits():
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_planning(loaded_img):
-    """Test RoboBrain2 planning model with the default (2.5 family) checkpoint."""
+    """Test RoboBrain2 planning model with the default checkpoint."""
     data_general = PlanningInput(
         query=[{"role": "user", "content": "What is in this image?"}],
         task="general",

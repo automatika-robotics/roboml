@@ -251,7 +251,7 @@ class RoboBrain2(ModelTemplate):
 
     def _initialize(
         self,
-        checkpoint: str = "BAAI/RoboBrain2.5-4B",
+        checkpoint: str = "BAAI/RoboBrain2.0-3B",
         source: Optional[Literal["huggingface", "modelscope"]] = None,
     ) -> None:
         """Initialize Model.

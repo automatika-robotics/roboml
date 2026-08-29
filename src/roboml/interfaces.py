@@ -52,7 +52,9 @@ class LLMInput(BaseModel):
         title="Maximum number of new tokens to be generated", default=512
     )
     temperature: float = Field(
-        title="Temperature with which inference is to be generated", default=0.7
+        title="Temperature with which inference is to be generated",
+        default=0.7,
+        gt=0,
     )
     stream: bool = Field(title="Stream output response", default=False)
 
@@ -104,6 +106,10 @@ class PlanningInput(VLLMInput):
 
     task: Literal["general", "pointing", "affordance", "trajectory", "grounding"] = (
         Field(default="general", title="One of the tasks the model is trained on")
+    )
+    # default matches the fixed budget in the official RoboBrain inference code
+    max_new_tokens: int = Field(
+        title="Maximum number of new tokens to be generated", default=768
     )
     enable_thinking: bool = Field(default=True)
 

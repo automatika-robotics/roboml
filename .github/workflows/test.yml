@@ -34,4 +34,5 @@ jobs:
 
     - name: Run CI tests
       run: |
-        python -m pytest tests/test_imports.py tests/test_interfaces.py tests/test_utils.py tests/test_vision_unit.py tests/test_tts_unit.py tests/test_download.py tests/test_checkpoint_source.py tests/test_planning_unit.py tests/test_chat_unit.py -v
+        # run everything except the integration suites (GPU, model downloads, live servers)
+        python -m pytest tests/ --ignore=tests/test_models.py --ignore=tests/test_ray.py --ignore=tests/test_resp.py -v

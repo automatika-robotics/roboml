@@ -50,6 +50,15 @@ def test_resp_connect():
     assert response == b"PONG"
 
 
+def test_resp3_connect():
+    """
+    Test connection with the RESP3 handshake (default in redis-py >= 8)
+    """
+    r = Redis("localhost", port=6379, protocol=3)
+    response = r.execute_command(b"PING")
+    assert response == b"PONG"
+
+
 def test_add_node():
     """
     Test adding model node

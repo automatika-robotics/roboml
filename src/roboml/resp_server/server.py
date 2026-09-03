@@ -22,12 +22,67 @@ OK = b"+OK\r\n"
 COMMAND_PING = b"PING"
 PONG = b"+PONG\r\n"
 COMMAND_QUIT = b"QUIT"
+COMMAND_HELLO = b"HELLO"
 BUILT_IN_COMMANDS = (COMMAND_PING, COMMAND_QUIT)
 ERROR_INVALID_COMMAND = b"-INVALID_COMMAND\r\n"
 ERROR_INVALID_MSGPACK = b"-INVALID_ARGS\r\n"
+ERROR_INVALID_PROTOCOL = (
+    b"-NOPROTO unsupported protocol version, this server speaks RESP2 and RESP3\r\n"
+)
 
 # patch msgpack for numpy arrays
 m_pack.patch()
+
+
+def _resp_bulk(value: bytes) -> bytes:
+    """Encode a value as a RESP bulk string.
+
+    :param value:
+    :type value: bytes
+    :rtype: bytes
+    """
+    return b"$%d\r\n%b\r\n" % (len(value), value)
+
+
+def hello_reply(args: list) -> bytes:
+    """Build the reply to a HELLO handshake (sent by RESP3 capable clients)
+
+    AUTH/SETNAME arguments are accepted and ignored as the server has no
+    authentication.
+
+    :param args: arguments following the HELLO command
+    :type args: list
+    :rtype: bytes
+    """
+    proto = 2
+    if args:
+        try:
+            proto = int(args[0])
+        except ValueError:
+            return ERROR_INVALID_PROTOCOL
+        if proto not in (2, 3):
+            return ERROR_INVALID_PROTOCOL
+
+    try:
+        from importlib.metadata import version
+
+        server_version = version("roboml").encode("utf-8")
+    except Exception:
+        server_version = b"0"
+
+    fields: list[tuple[bytes, bytes | int]] = [
+        (b"server", b"roboml"),
+        (b"version", server_version),
+        (b"proto", proto),
+        (b"mode", b"standalone"),
+    ]
+    payload = b""
+    for key, value in fields:
+        payload += _resp_bulk(key)
+        payload += b":%d\r\n" % value if isinstance(value, int) else _resp_bulk(value)
+    if proto == 3:
+        return b"%%%d\r\n%b" % (len(fields), payload)
+    return b"*%d\r\n%b" % (len(fields) * 2, payload)
 
 
 class Server:
@@ -62,6 +117,11 @@ class Server:
                 if incoming_command == b"CLIENT":
                     # Handle redis client identification messages
                     writer.write(OK)
+                    await writer.drain()
+                    continue
+                elif incoming_command == COMMAND_HELLO:
+                    # Protocol handshake of RESP3 capable clients
+                    writer.write(hello_reply(data[1:]))
                     await writer.drain()
                     continue
                 elif incoming_command == COMMAND_QUIT:
@@ -212,7 +272,7 @@ class Server:
                     writer.write(OK)
                     return None
                 resp = msgpack.packb(result)
-                writer.write(b"$%d\r\n%b\r\n" % (len(resp), resp))
+                writer.write(_resp_bulk(resp))
         except ValidationError as e:
             errors = []
             for idx, err in enumerate(e.errors()):
